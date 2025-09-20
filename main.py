@@ -258,7 +258,7 @@ if query:
                 raw_paths = []
 
             # Convert paths to local app paths
-            paths = [os.path.join(BASE_DIR, p + ".png") for p in raw_paths]
+            paths = [os.path.join(*p.split("/")) + ".png" for p in raw_paths]
 
             # Fallback to placeholder if no images
             if not paths:
