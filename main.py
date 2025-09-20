@@ -279,7 +279,7 @@ if query:
                     cols = st.columns(n_cols)
 
                     for i, path in enumerate(paths):
-                        path.lower()
+                        path = path.lower()
                         col = cols[i % n_cols]
 
                         if os.path.exists(path):
@@ -300,7 +300,7 @@ if query:
                                     f"""
                                     <div title="{hover_info_html}" style="text-align:center; margin-bottom:5px;">
                                         <img src="data:image/png;base64,{img_b64}" width="150" style="max-width:100%;"><br>
-                                        <small>Missing: {os.path.basename(path)}</small>
+                                        <small>Missing: {path}</small>
                                     </div>
                                     """,
                                     unsafe_allow_html=True,
