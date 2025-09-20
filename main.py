@@ -261,7 +261,8 @@ if query:
                     raw_paths = []
 
                 # Convert DataFrame paths to valid relative OS paths with .png
-                paths = [os.path.join(*p.split("/")) + ".png" for p in raw_paths]
+                paths = [os.path.join(*p.split("/")) +
+                         ".png" for p in raw_paths]
 
                 # Hover info
                 hover_info = f"""
@@ -367,8 +368,9 @@ st.markdown(
 st.sidebar.markdown(
     """
     ### Credits
-    Images & data © Coryn Club
+    Images & data © [Coryn Club](https://coryn.club/index.php)
+    
     App by Schnee 
-    [GitHub](https://github.com/yourgithub)
+    [GitHub](https://github.com/KarenYuusha/toram-item-search)
     """
 )
