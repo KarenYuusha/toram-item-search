@@ -10,6 +10,7 @@ import re
 import html as html_lib
 
 PLACEHOLDER = "placeholder.jpg"
+BASE_DIR = os.path.dirname(__file__)
 
 df = pd.read_csv('coryn_items.csv')
 
@@ -62,26 +63,6 @@ def image_to_base64(path):
     with open(path, "rb") as f:
         data = f.read()
     return base64.b64encode(data).decode()
-
-
-def render_image(path, hover_info, placeholder=PLACEHOLDER):
-    """Render image with hover info; fallback to placeholder if missing."""
-    if not os.path.exists(path):
-        path = placeholder if os.path.exists(placeholder) else None
-        label = "No image available"
-    else:
-        label = os.path.splitext(os.path.basename(path))[0]
-        label = label.replace('_', ' ')
-
-    if path:
-        img_b64 = image_to_base64(path)
-        return f"""
-        <div title="{hover_info}">
-            <img src="data:image/png;base64,{img_b64}" width="150"><br>
-            <small>{label}</small>
-        </div>
-        """
-    return None
 
 # pagination stuff
 
@@ -277,7 +258,7 @@ if query:
                 raw_paths = []
 
             # Convert paths to local app paths
-            paths = [p + ".png" for p in raw_paths]
+            paths = [os.path.join(BASE_DIR, p + ".png") for p in raw_paths]
 
             # Fallback to placeholder if no images
             if not paths:
@@ -299,8 +280,6 @@ if query:
                     # Build hover text with full details (like expander)
                     hover_lines = [
                         f"Name: {row['name']}",
-                        f"Type: {row['type']}",
-                        f"ID: {row['id']}",
                         f"Sell: {row.get('sell', 'N/A')}",
                         f"Process: {row.get('process', 'N/A')}",
                         f"Stats: {row.get('stats', 'N/A')}",
@@ -309,7 +288,6 @@ if query:
                     ]
                     hover_text = html_lib.escape("\n".join(hover_lines))
 
-                    # Render HTML with tooltip
                     html = f"""
                     <div style="text-align:center; margin-bottom:5px;" title="{hover_text}">
                         <img src="data:image/png;base64,{img_b64}" width="150" style="max-width:100%;"><br>
@@ -318,9 +296,6 @@ if query:
                     """
                     col.markdown(html, unsafe_allow_html=True)
 
-            # ----------------------------
-            # Info in expander (click to see)
-            # ----------------------------
             with st.expander(f"Details for {row['name']}"):
                 st.write(f"Type: {row['type']}")
                 st.write(f"ID: {row['id']}")
