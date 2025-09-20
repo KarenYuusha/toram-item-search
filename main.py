@@ -253,48 +253,73 @@ if query:
         page_results = results.iloc[start:start + items_per_page]
 
         for _, row in page_results.iterrows():
-            raw_paths = row.get("image_paths", [])
-            if not isinstance(raw_paths, list):
-                raw_paths = []
+            with st.container():
+                st.subheader(f"{row['name']} ({row['type']})")
 
-            # Convert paths to local app paths
-            paths = [os.path.join(*p.split("/")) + ".png" for p in raw_paths]
+                raw_paths = row.get("image_paths", [])
+                if not isinstance(raw_paths, list):
+                    raw_paths = []
 
-            # Fallback to placeholder if no images
-            if not paths:
-                paths = [PLACEHOLDER] if os.path.exists(PLACEHOLDER) else []
+                # Convert DataFrame paths to valid relative OS paths with .png
+                paths = [os.path.join(*p.split("/")) + ".png" for p in raw_paths]
 
-            n_cols = min(4, max(1, len(paths)))
-            cols = st.columns(n_cols)
+                # Hover info
+                hover_info = f"""
+                Name: {row['name']}
+                Sell: {row['sell'] if pd.notna(row['sell']) else 'N/A'}
+                Process: {row['process'] if pd.notna(row['process']) else 'N/A'}
+                Stats: {row['stats'] if pd.notna(row['stats']) else 'N/A'}
+                Monsters: {row['obtained_monster'] if pd.notna(row['obtained_monster']) else 'N/A'}
+                Maps: {row['obtained_map'] if pd.notna(row['obtained_map']) else 'N/A'}
+                """.strip()
+                hover_info_html = hover_info.replace('"', '&quot;')
 
-            for i, path in enumerate(paths):
-                col = cols[i % n_cols]
+                if paths:
+                    n_cols = min(4, max(1, len(paths)))
+                    cols = st.columns(n_cols)
 
-                if not os.path.exists(path):
-                    path = PLACEHOLDER if os.path.exists(PLACEHOLDER) else None
+                    for i, path in enumerate(paths):
+                        col = cols[i % n_cols]
 
-                if path:
-                    # Convert image to base64
-                    img_b64 = image_to_base64(path)
-
-                    # Build hover text with full details (like expander)
-                    hover_lines = [
-                        f"Name: {row['name']}",
-                        f"Sell: {row.get('sell', 'N/A')}",
-                        f"Process: {row.get('process', 'N/A')}",
-                        f"Stats: {row.get('stats', 'N/A')}",
-                        f"Monsters: {row.get('obtained_monster', 'N/A')}",
-                        f"Maps: {row.get('obtained_map', 'N/A')}"
-                    ]
-                    hover_text = html_lib.escape("\n".join(hover_lines))
-
-                    html = f"""
-                    <div style="text-align:center; margin-bottom:5px;" title="{hover_text}">
-                        <img src="data:image/png;base64,{img_b64}" width="150" style="max-width:100%;"><br>
-                        <small>{row['name']}</small>
-                    </div>
-                    """
-                    col.markdown(html, unsafe_allow_html=True)
+                        if os.path.exists(path):
+                            img_b64 = image_to_base64(path)
+                            col.markdown(
+                                f"""
+                                <div title="{hover_info_html}" style="text-align:center; margin-bottom:5px;">
+                                    <img src="data:image/png;base64,{img_b64}" width="150" style="max-width:100%;"><br>
+                                    <small>{row['name']}</small>
+                                </div>
+                                """,
+                                unsafe_allow_html=True,
+                            )
+                        else:
+                            if os.path.exists(PLACEHOLDER):
+                                img_b64 = image_to_base64(PLACEHOLDER)
+                                col.markdown(
+                                    f"""
+                                    <div title="{hover_info_html}" style="text-align:center; margin-bottom:5px;">
+                                        <img src="data:image/png;base64,{img_b64}" width="150" style="max-width:100%;"><br>
+                                        <small>Missing: {os.path.basename(path)}</small>
+                                    </div>
+                                    """,
+                                    unsafe_allow_html=True,
+                                )
+                            else:
+                                col.error(f"Missing: {path}")
+                else:  # No images at all
+                    if os.path.exists(PLACEHOLDER):
+                        img_b64 = image_to_base64(PLACEHOLDER)
+                        st.markdown(
+                            f"""
+                            <div title="{hover_info_html}" style="text-align:center; margin-bottom:5px;">
+                                <img src="data:image/png;base64,{img_b64}" width="150" style="max-width:100%;"><br>
+                                <small>No image available</small>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        st.info(f"No images available for **{row['name']}**")
 
             with st.expander(f"Details for {row['name']}"):
                 st.write(f"Type: {row['type']}")
