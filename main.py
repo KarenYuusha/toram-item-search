@@ -363,3 +363,12 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+st.sidebar.markdown(
+    """
+    ### Credits
+    Images & data © Coryn Club
+    App by Schnee 
+    [GitHub](https://github.com/yourgithub)
+    """
+)
