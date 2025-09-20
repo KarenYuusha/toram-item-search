@@ -7,6 +7,7 @@ import time
 import os
 import base64
 import re
+import html as html_lib
 
 PLACEHOLDER = "placeholder.jpg"
 
@@ -215,7 +216,7 @@ if query:
         st.session_state.last_query = query
         st.session_state.last_k = k
 
-        # --- Pagination ---
+        # Pagination
         items_per_page = 20
         total_pages = (len(results) - 1) // items_per_page + 1
         if "page" not in st.session_state:
@@ -225,15 +226,12 @@ if query:
             st.session_state.page, total_pages, max_visible=7)
         num_buttons = len(pages_to_show)
 
-        # --- Layout ---
         prev_col, pages_col, next_col = st.columns(
             [1, 6, 1])  # Prev + pages + Next
 
-        # Prev button
         with prev_col:
             st.button("⬅️ Prev", on_click=go_prev)
 
-        # Page buttons (centered)
         with pages_col:
             btn_cols = st.columns(len(pages_to_show))
             for i, p in enumerate(pages_to_show):
@@ -264,7 +262,6 @@ if query:
                         if st.button(str(p), key=f"page_{p}", on_click=go_page, args=(p,)):
                             pass
 
-        # Next button
         with next_col:
             st.button("Next ➡️", on_click=go_next)
 
@@ -274,17 +271,15 @@ if query:
         start = (st.session_state.page - 1) * items_per_page
         page_results = results.iloc[start:start + items_per_page]
 
-        # Display results
         for _, row in page_results.iterrows():
-
-            # ----------------------------
-            # Images first (always visible)
-            # ----------------------------
             raw_paths = row.get("image_paths", [])
             if not isinstance(raw_paths, list):
                 raw_paths = []
 
+            # Convert paths to local app paths
             paths = [os.path.join(*p.split("/")) + ".png" for p in raw_paths]
+
+            # Fallback to placeholder if no images
             if not paths:
                 paths = [PLACEHOLDER] if os.path.exists(PLACEHOLDER) else []
 
@@ -293,16 +288,35 @@ if query:
 
             for i, path in enumerate(paths):
                 col = cols[i % n_cols]
+
                 if not os.path.exists(path):
                     path = PLACEHOLDER if os.path.exists(PLACEHOLDER) else None
+
                 if path:
+                    # Convert image to base64
                     img_b64 = image_to_base64(path)
-                    col.markdown(f'''
-                    <div style="text-align:center; margin-bottom:5px;">
+
+                    # Build hover text with full details (like expander)
+                    hover_lines = [
+                        f"Name: {row['name']}",
+                        f"Type: {row['type']}",
+                        f"ID: {row['id']}",
+                        f"Sell: {row.get('sell', 'N/A')}",
+                        f"Process: {row.get('process', 'N/A')}",
+                        f"Stats: {row.get('stats', 'N/A')}",
+                        f"Monsters: {row.get('obtained_monster', 'N/A')}",
+                        f"Maps: {row.get('obtained_map', 'N/A')}"
+                    ]
+                    hover_text = html_lib.escape("\n".join(hover_lines))
+
+                    # Render HTML with tooltip
+                    html = f"""
+                    <div style="text-align:center; margin-bottom:5px;" title="{hover_text}">
                         <img src="data:image/png;base64,{img_b64}" width="150" style="max-width:100%;"><br>
                         <small>{row['name']}</small>
                     </div>
-                    ''', unsafe_allow_html=True)
+                    """
+                    col.markdown(html, unsafe_allow_html=True)
 
             # ----------------------------
             # Info in expander (click to see)
@@ -316,7 +330,7 @@ if query:
                 st.write(f"Monsters: {row.get('obtained_monster', 'N/A')}")
                 st.write(f"Maps: {row.get('obtained_map', 'N/A')}")
 
-# --- Floating Back to Top Button ---
+# back to top
 st.markdown(
     """
     <style>
