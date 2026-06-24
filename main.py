@@ -1,9 +1,9 @@
 import pandas as pd
-from module.search_engine import search_engine
+from module.search_engine import GEAR_TYPES, search_engine
 from module.normalizer import standard_prep
 import streamlit as st
+import streamlit.components.v1 as components
 import ast
-import time
 import os
 import base64
 import re
@@ -11,30 +11,27 @@ import html as html_lib
 
 PLACEHOLDER = "placeholder.jpg"
 BASE_DIR = os.path.dirname(__file__)
+DATA_PATH = os.path.join(BASE_DIR, 'coryn_items.csv')
+PLACEHOLDER_PATH = os.path.join(BASE_DIR, PLACEHOLDER)
+AUTOCOMPLETE_COMPONENT_PATH = os.path.join(BASE_DIR, "components", "autocomplete_search")
 
-df = pd.read_csv('coryn_items.csv')
+# UI
+st.set_page_config(page_title="Item Search", layout="wide")
+autocomplete_search = components.declare_component(
+    "autocomplete_search",
+    path=AUTOCOMPLETE_COMPONENT_PATH,
+)
 
-df['image_paths'] = df['image_paths'].apply(ast.literal_eval)
-df['name_clean'] = df['name'].apply(standard_prep)
 
-if isinstance(df['image_paths'].iloc[0], str):
-    df['image_paths'] = df['image_paths'].apply(ast.literal_eval)
+@st.cache_data
+def load_items():
+    items = pd.read_csv(DATA_PATH)
+    items['image_paths'] = items['image_paths'].apply(ast.literal_eval)
+    items['name_clean'] = items['name'].apply(standard_prep)
+    return items
 
-# --- Weapon/app types ---
-wp_types_list = [
-    'armor',
-    'additional',
-    'shield',
-    '1 handed sword',
-    '2 handed sword',
-    'bow',
-    'bowgun',
-    'knuckles',
-    'magic device',
-    'staff',
-    'halberd',
-    'katana'
-]
+
+df = load_items()
 
 
 def get_all_stats(df, min_occurrence=6):
@@ -59,6 +56,27 @@ def get_all_stats(df, min_occurrence=6):
     return filtered_stats
 
 
+def get_autocomplete_suggestions(df, all_stats):
+    item_suggestions = df['name'].dropna().astype(str).tolist()
+    stat_suggestions = [f"stat: {stat}" for stat in all_stats]
+    type_suggestions = [f"all {item_type}" for item_type in GEAR_TYPES]
+    aliases = [
+        "all ring",
+        "all rings",
+        "all special",
+        "stat: cr",
+        "stat: cd",
+        "stat: aggro%",
+        "stat: atk%",
+        "stat: matk%",
+        "stat: physical pierce",
+        "stat: magical pierce",
+    ]
+
+    return list(dict.fromkeys([*type_suggestions, *aliases, *stat_suggestions, *item_suggestions]))
+
+
+@st.cache_data
 def image_to_base64(path):
     with open(path, "rb") as f:
         data = f.read()
@@ -68,7 +86,7 @@ def image_to_base64(path):
 
 
 def go_prev(): st.session_state.page = max(1, st.session_state.page - 1)
-def go_next(): st.session_state.page = min(
+def go_next(total_pages): st.session_state.page = min(
     total_pages, st.session_state.page + 1)
 
 
@@ -90,13 +108,11 @@ def get_page_range(current, total, max_visible=7):
     return pages
 
 
+all_stats = get_all_stats(df)
+autocomplete_suggestions = get_autocomplete_suggestions(df, all_stats)
+
 # anchor
 st.markdown("<a name='top'></a>", unsafe_allow_html=True)
-
-# UI
-st.set_page_config(page_title="Item Search", layout="wide")
-
-all_stats = get_all_stats(df)
 
 with st.expander("📋 Show All Available Stats (click to expand)"):
     search_component = """
@@ -163,9 +179,9 @@ with st.expander("📋 Show All Available Stats (click to expand)"):
     </script>
     """
 
-    items_html = "".join([f"<li>{stat}</li>" for stat in all_stats])
+    items_html = "".join([f"<li>{html_lib.escape(stat)}</li>" for stat in all_stats])
 
-    st.components.v1.html(
+    components.html(
         search_component.format(items=items_html),
         height=250,  # adjust depending on desired visible area
         scrolling=False
@@ -174,28 +190,62 @@ with st.expander("📋 Show All Available Stats (click to expand)"):
 st.title("🔎 Item Search Engine")
 
 # session init
-for key, default in {"last_query": "", "last_k": None, "page": 1}.items():
+for key, default in {"query": "", "last_query": "", "last_k": None, "last_type_filters": [], "page": 1}.items():
     if key not in st.session_state:
         st.session_state[key] = default
 
-query = st.text_input(
-    "Search for an item by name (or type 'all <type>' or 'stat:<stat_name>'):", "")
+st.caption("Search by item name, or use commands like `all armor` / `stat: critical rate`. Press `Tab` to accept the best autocomplete preview.")
+use_tab_autocomplete = st.toggle("Use experimental Tab autocomplete", value=False)
+if use_tab_autocomplete:
+    query_value = autocomplete_search(
+        value=st.session_state.query,
+        suggestions=autocomplete_suggestions,
+        placeholder="Search items, stats, or types...",
+        key="query_autocomplete",
+        default=st.session_state.query,
+    )
+    if query_value is not None:
+        st.session_state.query = query_value
+else:
+    st.session_state.query = st.text_input(
+        "Search",
+        value=st.session_state.query,
+        placeholder="Search items, stats, or types...",
+    )
+query = st.session_state.query
 
 with st.expander("⚙️ Settings"):
     k = st.slider("Number of results (k, fuzzy only):", 1, 200, 20)
+    type_filter_options = [item_type.title() for item_type in GEAR_TYPES]
+    selected_type_filters = st.multiselect(
+        "Filter by item type:",
+        type_filter_options,
+        help="Works with name search, stat search, and all searches. Use Special for rings.",
+    )
+    ascending = st.toggle(
+        "Sort stat searches lowest first",
+        value=False,
+        help="By default stat searches show the highest stat values first.",
+    )
 
 
 if query:
-    results = search_engine(query, df, k=k)
+    type_filters = [item_type.lower() for item_type in selected_type_filters]
+    results = search_engine(query, df, k=k, ascending=ascending, type_filters=type_filters)
 
     if results.empty:
         st.warning("No matches found.")
     else:
         # Reset page if query or k changes
-        if query != st.session_state.last_query or k != st.session_state.last_k:
+        if (
+            query != st.session_state.last_query
+            or k != st.session_state.last_k
+            or type_filters != st.session_state.last_type_filters
+        ):
             st.session_state.page = 1
         st.session_state.last_query = query
         st.session_state.last_k = k
+        st.session_state.last_type_filters = type_filters
 
         # Pagination
         items_per_page = 20
@@ -244,7 +294,7 @@ if query:
                             pass
 
         with next_col:
-            st.button("Next ➡️", on_click=go_next)
+            st.button("Next ➡️", on_click=go_next, args=(total_pages,))
 
         st.markdown(f"**Page {st.session_state.page} / {total_pages}**")
 
@@ -273,44 +323,46 @@ if query:
                 Monsters: {row['obtained_monster'] if pd.notna(row['obtained_monster']) else 'N/A'}
                 Maps: {row['obtained_map'] if pd.notna(row['obtained_map']) else 'N/A'}
                 """.strip()
-                hover_info_html = hover_info.replace('"', '&quot;')
+                hover_info_html = html_lib.escape(hover_info, quote=True)
 
                 if paths:
                     n_cols = min(4, max(1, len(paths)))
                     cols = st.columns(n_cols)
 
                     for i, path in enumerate(paths):
-                        path = path.lower()
+                        path = os.path.join(BASE_DIR, path.lower())
                         col = cols[i % n_cols]
 
                         if os.path.exists(path):
                             img_b64 = image_to_base64(path)
+                            name_html = html_lib.escape(row['name'])
                             col.markdown(
                                 f"""
                                 <div title="{hover_info_html}" style="text-align:center; margin-bottom:5px;">
                                     <img src="data:image/png;base64,{img_b64}" width="150" style="max-width:100%;"><br>
-                                    <small>{row['name']}</small>
+                                    <small>{name_html}</small>
                                 </div>
                                 """,
                                 unsafe_allow_html=True,
                             )
                         else:
-                            if os.path.exists(PLACEHOLDER):
-                                img_b64 = image_to_base64(PLACEHOLDER)
+                            if os.path.exists(PLACEHOLDER_PATH):
+                                img_b64 = image_to_base64(PLACEHOLDER_PATH)
+                                missing_html = html_lib.escape(os.path.relpath(path, BASE_DIR))
                                 col.markdown(
                                     f"""
                                     <div title="{hover_info_html}" style="text-align:center; margin-bottom:5px;">
                                         <img src="data:image/png;base64,{img_b64}" width="150" style="max-width:100%;"><br>
-                                        <small>Missing: {path}</small>
+                                        <small>Missing: {missing_html}</small>
                                     </div>
                                     """,
                                     unsafe_allow_html=True,
                                 )
                             else:
-                                col.error(f"Missing: {path}")
+                                col.error(f"Missing: {os.path.relpath(path, BASE_DIR)}")
                 else:  # No images at all
-                    if os.path.exists(PLACEHOLDER):
-                        img_b64 = image_to_base64(PLACEHOLDER)
+                    if os.path.exists(PLACEHOLDER_PATH):
+                        img_b64 = image_to_base64(PLACEHOLDER_PATH)
                         st.markdown(
                             f"""
                             <div title="{hover_info_html}" style="text-align:center; margin-bottom:5px;">

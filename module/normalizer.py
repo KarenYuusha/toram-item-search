@@ -36,6 +36,11 @@ WEAPON_ALIASES = {
     "hat": "additional",
     "ad":  "additional",
 
+    "ring": "special",
+    "rings": "special",
+    "special gear": "special",
+    "special": "special",
+
     "halberd": "halberd",
     "hb": "halberd",
 
@@ -68,13 +73,14 @@ STAT_ALIASES = {
     "dtlight": "% stronger against light",
 
     "cast speed": "cspd",
+    "attack speed": "aspd",
     "attack spped": "aspd",
 
     "acc": "accuracy",
     "defense": "def",
 
     "mag": "magic",
-    "phys": "physcial",
+    "phys": "physical",
 
     "dmg": "damage",
 
@@ -114,7 +120,7 @@ STAT_ALIASES = {
 
     "bar": "barrier",
 
-    "invi": "invicible",
+    "invi": "invincible",
 
     "gem dust": "gem dust drop amount %",
     "gem dust drop amount %": "gem dust drop amount %",
