@@ -90,3 +90,17 @@ def test_real_exact_guardian_has_no_interpretation_chips() -> None:
     assert outcome.skills is not None
     assert any(row.skill.name.casefold() == 'guardian' for row in outcome.skills.results)
     assert outcome.interpretation is None
+
+
+def test_real_exact_magic_finale_suppresses_weak_item_fallback() -> None:
+    outcome = search_database(
+        'Universal',
+        'MAGIC: FINALE',
+        items_path=ITEM_DATABASE,
+        skills_path=SKILL_DATABASE,
+    )
+    assert outcome.skills is not None
+    assert [row.skill.name.casefold() for row in outcome.skills.results] == ['magic: finale']
+    assert outcome.skills.route_quality.family == 'exact'
+    assert outcome.items is not None
+    assert not outcome.items.results
