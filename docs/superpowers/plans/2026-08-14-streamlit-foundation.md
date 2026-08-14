@@ -4,7 +4,7 @@
 
 **Goal:** Create the deployable Streamlit shell and a strict read-only contract for the two SQLite databases copied from `filter_search`.
 
-**Architecture:** The root `main.py` is a thin Streamlit entry point. Shared runtime code lives under `toram_search/`, and both SQLite files are opened through one read-only connection helper using SQLite URI `mode=ro`. This phase deliberately stops before item/skill query implementation; it leaves a running site that validates both databases, exposes the database-mode selector, and reports configuration failures clearly.
+**Architecture:** Root `main.py` is a thin Streamlit entry point. Shared runtime code lives under `toram_search/`. Both SQLite files are opened through one read-only connection helper using SQLite URI `mode=ro`. This phase deliberately stops before item/skill query implementation; it leaves a running site that validates the packaged databases, exposes the database-mode selector, and reports configuration failures clearly.
 
 **Tech Stack:** Python 3.12, Streamlit 1.61.x, SQLite via Python `sqlite3`, pytest 8.x, Streamlit `st.testing.v1.AppTest`.
 
@@ -20,7 +20,7 @@
 - No LLM, RAG, embeddings, Ollama, Qwen, Gemma, Discord, or vector-search runtime dependencies.
 - Universal / Items / Skills is a sidebar database selector; Universal is the default.
 - Keep `main.py` orchestration-only; reusable logic belongs in modules.
-- This plan must finish with a working Streamlit shell even before search logic exists.
+- This phase must finish with a working Streamlit shell even before search logic exists.
 
 ---
 
@@ -47,15 +47,18 @@ toram-item-search/
     └── test_app_shell.py
 ```
 
-### Locked Interfaces
+## Locked Foundation Models
 
 ```python
 # toram_search/models.py
+from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
 DatabaseMode = Literal["Universal", "Items", "Skills"]
+
 
 @dataclass(frozen=True)
 class DatabaseHealth:
@@ -65,41 +68,45 @@ class DatabaseHealth:
     error: str | None = None
 ```
 
-```python
-# toram_search/database.py
-from pathlib import Path
-import sqlite3
-from toram_search.models import DatabaseHealth
-
-ITEM_DATABASE = Path(__file__).resolve().parents[1] / "items.sqlite"
-SKILL_DATABASE = Path(__file__).resolve().parents[1] / "skills.sqlite"
-
-def connect_readonly(path: Path) -> sqlite3.Connection: ...
-def validate_item_database(path: Path) -> DatabaseHealth: ...
-def validate_skill_database(path: Path) -> DatabaseHealth: ...
-def validate_databases(
-    items_path: Path = ITEM_DATABASE,
-    skills_path: Path = SKILL_DATABASE,
-) -> tuple[DatabaseHealth, DatabaseHealth]: ...
-```
-
-Item validation in this phase must require only public-search data:
+Item validation requires only public-search columns:
 
 ```python
 ITEM_REQUIRED_COLUMNS = {
-    "items": {"id", "name", "item_type", "sell_price", "process_material", "process_amount", "badge", "note", "page_url"},
-    "item_stats": {"id", "item_id", "position", "stat_name", "amount", "conditions_json", "condition_text", "coryn_applies_to", "needs_condition_review"},
-    "item_sources": {"id", "item_id", "position", "source_id", "source_name", "level", "map", "dye", "source_url", "lookup_error"},
-    "item_images": {"id", "item_id", "position", "category", "gender", "variant", "local_path", "source_url"},
+    "items": {
+        "id", "name", "item_type", "sell_price", "process_material",
+        "process_amount", "badge", "note", "page_url",
+    },
+    "item_stats": {
+        "id", "item_id", "position", "stat_name", "amount",
+        "conditions_json", "condition_text", "coryn_applies_to",
+        "needs_condition_review",
+    },
+    "item_sources": {
+        "id", "item_id", "position", "source_id", "source_name",
+        "level", "map", "dye", "source_url", "lookup_error",
+    },
+    "item_images": {
+        "id", "item_id", "position", "category", "gender", "variant",
+        "local_path", "source_url",
+    },
 }
 ```
 
-Skill validation must require deterministic public-search data, including FTS, but must not require embeddings:
+Skill validation requires deterministic public-search tables, including FTS but not embeddings:
 
 ```python
 SKILL_REQUIRED_COLUMNS = {
-    "skill_trees": {"id", "name", "normalized_name", "tree_group", "general_text", "tier_requirements_json", "weapon_restrictions_json"},
-    "skills": {"id", "tree_id", "source_order", "name", "normalized_name", "tier", "required_level", "skill_type", "mp_cost_text", "mp_cost_value", "damage_type", "element", "cast_range_text", "hit_range_text", "cast_time_text", "hit_count_text", "description", "game_description", "raw_text"},
+    "skill_trees": {
+        "id", "name", "normalized_name", "tree_group", "general_text",
+        "tier_requirements_json", "weapon_restrictions_json",
+    },
+    "skills": {
+        "id", "tree_id", "source_order", "name", "normalized_name", "tier",
+        "required_level", "skill_type", "mp_cost_text", "mp_cost_value",
+        "damage_type", "element", "cast_range_text", "hit_range_text",
+        "cast_time_text", "hit_count_text", "description", "game_description",
+        "raw_text",
+    },
     "skill_aliases": {"skill_id", "position", "alias", "normalized_alias"},
     "skill_sections": {"skill_id", "position", "label", "normalized_label", "body"},
     "skill_ailments": {"skill_id", "position", "name", "normalized_name"},
@@ -124,20 +131,20 @@ SKILL_REQUIRED_COLUMNS = {
 
 **Interfaces:**
 - Consumes: none.
-- Produces: a minimal Python/Streamlit project importable by later tasks.
+- Produces: an importable Python/Streamlit project for later phases.
 
-- [ ] **Step 1: Write the runtime requirements**
+- [ ] **Step 1: Write runtime requirements**
 
-Create `requirements.txt` exactly as:
+Create `requirements.txt`:
 
 ```text
-streamlit>=1.61,<2
+streamlit>=1.61,<1.62
 rapidfuzz>=3,<4
 ```
 
-`rapidfuzz` is included now because the next item-search phase depends on it; no LLM or Discord dependency is allowed.
+The Streamlit range is intentionally limited to the verified 1.61.x API baseline used by this plan. `rapidfuzz` is included now because the item phase requires it.
 
-- [ ] **Step 2: Write the development requirements**
+- [ ] **Step 2: Write development requirements**
 
 Create `requirements-dev.txt`:
 
@@ -156,34 +163,32 @@ headless = true
 
 [browser]
 gatherUsageStats = false
-
-[theme]
-base = "dark"
 ```
 
-Do not hard-code accent colors yet; card/dialog styling is handled in the UI integration phase.
+Do not force a color theme in the foundation phase; final UI styling can remain compatible with Streamlit/user appearance defaults.
 
 - [ ] **Step 4: Add package markers**
 
-Create `toram_search/__init__.py` and `ui/__init__.py` with only module docstrings:
+Create `toram_search/__init__.py`:
 
 ```python
 """Deterministic Toram database search runtime."""
 ```
 
+Create `ui/__init__.py`:
+
 ```python
 """Streamlit presentation helpers."""
 ```
 
-- [ ] **Step 5: Verify imports**
-
-Run:
+- [ ] **Step 5: Install/verify imports**
 
 ```bash
+python -m pip install -r requirements-dev.txt
 python -c "import streamlit, rapidfuzz; print(streamlit.__version__)"
 ```
 
-Expected: exits 0 and prints a Streamlit 1.61.x version when the lock range resolves to the planned baseline.
+Expected: command exits 0 and Streamlit reports a 1.61.x version.
 
 - [ ] **Step 6: Commit**
 
@@ -203,11 +208,11 @@ git commit -m "chore: add Streamlit project foundation"
 
 **Interfaces:**
 - Consumes: Python `sqlite3`, `Path`.
-- Produces: `DatabaseMode`, `DatabaseHealth`, `connect_readonly`, and database validation functions used by every later phase.
+- Produces: `DatabaseMode`, `DatabaseHealth`, `connect_readonly`.
 
-- [ ] **Step 1: Write failing tests for read-only mode**
+- [ ] **Step 1: Write failing read-only tests**
 
-Create `tests/test_database.py` with a fixture that makes a temporary SQLite file and verifies both reading and write rejection:
+Create `tests/test_database.py`:
 
 ```python
 import sqlite3
@@ -244,41 +249,21 @@ def test_connect_readonly_rejects_missing_file(tmp_path: Path) -> None:
         connect_readonly(tmp_path / "missing.sqlite")
 ```
 
-- [ ] **Step 2: Run the tests and verify failure**
-
-Run:
+- [ ] **Step 2: Run and verify failure**
 
 ```bash
 pytest tests/test_database.py -v
 ```
 
-Expected: collection/import failure because `toram_search.database` does not exist yet.
+Expected: import failure because `toram_search.database` is not implemented yet.
 
-- [ ] **Step 3: Implement the shared models**
+- [ ] **Step 3: Add shared models**
 
-Create `toram_search/models.py`:
+Create `toram_search/models.py` using the locked `DatabaseMode` and `DatabaseHealth` definitions above.
 
-```python
-from __future__ import annotations
+- [ ] **Step 4: Implement `connect_readonly`**
 
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Literal
-
-DatabaseMode = Literal["Universal", "Items", "Skills"]
-
-
-@dataclass(frozen=True)
-class DatabaseHealth:
-    name: str
-    path: Path
-    ok: bool
-    error: str | None = None
-```
-
-- [ ] **Step 4: Implement the minimal read-only connection helper**
-
-Start `toram_search/database.py` with:
+Create `toram_search/database.py`:
 
 ```python
 from __future__ import annotations
@@ -304,11 +289,9 @@ def connect_readonly(path: Path) -> sqlite3.Connection:
     return connection
 ```
 
-Do not expose a writable connection helper.
+Do not add a writable connection helper.
 
-- [ ] **Step 5: Run the read-only tests**
-
-Run:
+- [ ] **Step 5: Run focused tests**
 
 ```bash
 pytest tests/test_database.py::test_connect_readonly_can_read_but_cannot_write tests/test_database.py::test_connect_readonly_rejects_missing_file -v
@@ -316,7 +299,7 @@ pytest tests/test_database.py::test_connect_readonly_can_read_but_cannot_write t
 
 Expected: 2 passed.
 
-- [ ] **Step 6: Commit the read-only contract**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add toram_search/models.py toram_search/database.py tests/test_database.py
@@ -325,21 +308,37 @@ git commit -m "feat: enforce read-only SQLite access"
 
 ---
 
-### Task 3: Add Schema Validation and Copy the Canonical Databases
+### Task 3: Add Schema Validation
 
 **Files:**
 - Modify: `toram_search/database.py`
 - Modify: `tests/test_database.py`
-- Copy binary: `items.sqlite`
-- Copy binary: `skills.sqlite`
 
 **Interfaces:**
 - Consumes: `connect_readonly`.
 - Produces: `validate_item_database`, `validate_skill_database`, `validate_databases`.
 
-- [ ] **Step 1: Write failing schema-validation tests**
+Target signatures:
 
-Append tests that construct intentionally incomplete databases:
+```python
+def validate_item_database(path: Path) -> DatabaseHealth:
+    ...
+
+
+def validate_skill_database(path: Path) -> DatabaseHealth:
+    ...
+
+
+def validate_databases(
+    items_path: Path = ITEM_DATABASE,
+    skills_path: Path = SKILL_DATABASE,
+) -> tuple[DatabaseHealth, DatabaseHealth]:
+    ...
+```
+
+- [ ] **Step 1: Write failing validation tests**
+
+Append:
 
 ```python
 from toram_search.database import validate_item_database, validate_skill_database
@@ -370,7 +369,9 @@ def test_skill_validation_does_not_require_embedding_table(tmp_path: Path) -> No
     }
     for table, columns in required.items():
         connection.execute(f"CREATE TABLE {table}({columns})")
-    connection.execute("CREATE VIRTUAL TABLE skill_fts USING fts5(document_id, skill_id, name, tree_name, text)")
+    connection.execute(
+        "CREATE VIRTUAL TABLE skill_fts USING fts5(document_id, skill_id, name, tree_name, text)"
+    )
     connection.commit()
     connection.close()
 
@@ -378,19 +379,19 @@ def test_skill_validation_does_not_require_embedding_table(tmp_path: Path) -> No
     assert health.ok is True
 ```
 
-This test intentionally omits `skill_embedding_vectors` to enforce the no-embedding runtime contract.
+This fixture intentionally omits `skill_embedding_vectors`.
 
-- [ ] **Step 2: Run the new tests and verify failure**
+- [ ] **Step 2: Run and verify failure**
 
 ```bash
 pytest tests/test_database.py -v
 ```
 
-Expected: failures because validation functions are not implemented.
+Expected: validation functions missing.
 
-- [ ] **Step 3: Implement reusable table/column validation**
+- [ ] **Step 3: Implement common schema validation**
 
-Add constants matching the Locked Interfaces section, plus:
+Add the locked required-column dictionaries and:
 
 ```python
 def _validate_schema(
@@ -419,7 +420,7 @@ def _validate_schema(
         return DatabaseHealth(name, Path(path), False, str(exc))
 ```
 
-Then implement:
+Then:
 
 ```python
 def validate_item_database(path: Path) -> DatabaseHealth:
@@ -437,28 +438,43 @@ def validate_databases(
     return validate_item_database(items_path), validate_skill_database(skills_path)
 ```
 
-- [ ] **Step 4: Run validation tests**
+- [ ] **Step 4: Run tests**
 
 ```bash
 pytest tests/test_database.py -v
 ```
 
-Expected: all tests pass.
+Expected: all pass.
 
-- [ ] **Step 5: Copy the canonical database files from the reference repo**
+- [ ] **Step 5: Commit**
 
-From a workspace containing both repositories as siblings:
+```bash
+git add toram_search/database.py tests/test_database.py
+git commit -m "feat: validate Toram SQLite schemas"
+```
+
+---
+
+### Task 4: Copy and Verify the Canonical SQLite Files
+
+**Files:**
+- Copy binary: `items.sqlite`
+- Copy binary: `skills.sqlite`
+
+**Interfaces:**
+- Consumes: canonical DB files from the sibling `filter_search` checkout.
+- Produces: root-level packaged databases used by Streamlit.
+
+- [ ] **Step 1: Copy the exact source databases**
 
 ```bash
 cp ../filter_search/coryn_data/database/items.sqlite ./items.sqlite
 cp ../filter_search/coryn_data/database/skills.sqlite ./skills.sqlite
 ```
 
-Do not run any editor or migration against the copied files.
+Do not run an editor, migration, vacuum-with-write, or rebuild command against the copies.
 
-- [ ] **Step 6: Validate the real copied databases**
-
-Run:
+- [ ] **Step 2: Validate both real files**
 
 ```bash
 python - <<'PY'
@@ -469,11 +485,9 @@ for health in validate_databases():
 PY
 ```
 
-Expected: two `DatabaseHealth(... ok=True ...)` records and exit code 0.
+Expected: both `DatabaseHealth` rows have `ok=True`.
 
-- [ ] **Step 7: Prove the copied database is read-only through app code**
-
-Run:
+- [ ] **Step 3: Prove runtime write rejection against the real item copy**
 
 ```bash
 python - <<'PY'
@@ -493,16 +507,16 @@ PY
 
 Expected: exit 0.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 4: Commit database copies**
 
 ```bash
-git add toram_search/database.py tests/test_database.py items.sqlite skills.sqlite
-git commit -m "feat: validate packaged Toram databases"
+git add items.sqlite skills.sqlite
+git commit -m "data: add Toram SQLite databases"
 ```
 
 ---
 
-### Task 4: Build the Running Streamlit Shell and Sidebar Mode Selector
+### Task 5: Build the Running Streamlit Shell and Sidebar Selector
 
 **Files:**
 - Create: `ui/sidebar.py`
@@ -510,10 +524,10 @@ git commit -m "feat: validate packaged Toram databases"
 - Create: `tests/test_app_shell.py`
 
 **Interfaces:**
-- Consumes: `DatabaseMode`, `validate_databases`.
-- Produces: a running root Streamlit app and `render_database_sidebar() -> DatabaseMode`.
+- Consumes: `DatabaseMode`, database health functions.
+- Produces: `render_database_sidebar() -> DatabaseMode` and a root Streamlit shell.
 
-- [ ] **Step 1: Write a failing AppTest smoke test**
+- [ ] **Step 1: Write failing AppTest coverage**
 
 Create `tests/test_app_shell.py`:
 
@@ -523,14 +537,14 @@ from streamlit.testing.v1 import AppTest
 
 def test_app_starts_and_defaults_to_universal() -> None:
     app = AppTest.from_file("main.py").run(timeout=10)
-    assert not app.exception
+    assert list(app.exception) == []
     assert any(title.value == "Toram Database" for title in app.title)
     assert app.radio[0].value == "Universal"
 
 
 def test_sidebar_exposes_all_database_modes() -> None:
     app = AppTest.from_file("main.py").run(timeout=10)
-    assert app.radio[0].options == ["Universal", "Items", "Skills"]
+    assert tuple(app.radio[0].options) == ("Universal", "Items", "Skills")
 ```
 
 - [ ] **Step 2: Run and verify failure**
@@ -562,13 +576,11 @@ def render_database_sidebar() -> DatabaseMode:
             index=0,
         )
         st.divider()
-        st.caption("About · Credits · GitHub links are added in the integration phase.")
+        st.caption("About, Credits, and GitHub links are added in the integration phase.")
     return mode
 ```
 
-- [ ] **Step 4: Implement the root `main.py` shell**
-
-Create `main.py` with only orchestration:
+- [ ] **Step 4: Implement root `main.py` shell**
 
 ```python
 from __future__ import annotations
@@ -578,7 +590,7 @@ import streamlit as st
 from toram_search.database import validate_databases
 from ui.sidebar import render_database_sidebar
 
-st.set_page_config(page_title="Toram Database", page_icon="🔎", layout="wide")
+st.set_page_config(page_title="Toram Database", layout="wide")
 
 mode = render_database_sidebar()
 item_health, skill_health = validate_databases()
@@ -596,7 +608,7 @@ st.caption(f"Database mode: {mode}")
 st.info("Search interface will be enabled in the next implementation phases.")
 ```
 
-`main.py` must not contain SQL or parsing logic.
+The final integration phase will make health checks mode-aware. At this foundation point both packaged DBs are expected to exist, so all-or-nothing startup is acceptable temporarily.
 
 - [ ] **Step 5: Run AppTest**
 
@@ -604,15 +616,15 @@ st.info("Search interface will be enabled in the next implementation phases.")
 pytest tests/test_app_shell.py -v
 ```
 
-Expected: all tests pass.
+Expected: all pass.
 
-- [ ] **Step 6: Run the full phase test suite**
+- [ ] **Step 6: Run all foundation tests**
 
 ```bash
 pytest -q
 ```
 
-Expected: all tests pass.
+Expected: all pass.
 
 - [ ] **Step 7: Commit**
 
@@ -623,7 +635,7 @@ git commit -m "feat: add Streamlit database shell"
 
 ---
 
-### Task 5: Document Deployment and the Database Replacement Workflow
+### Task 6: Document Deployment and Database Replacement
 
 **Files:**
 - Create: `README.md`
@@ -631,35 +643,50 @@ git commit -m "feat: add Streamlit database shell"
 
 **Interfaces:**
 - Consumes: completed foundation.
-- Produces: reproducible local/deployment instructions and a regression check that root `main.py` remains executable.
+- Produces: reproducible local/deployment/update instructions.
 
-- [ ] **Step 1: Write README content**
+- [ ] **Step 1: Write README**
 
-Create `README.md` with these sections and commands:
+Create `README.md` with the following actual sections (the shell commands below are fenced individually in the README; do not nest code fences):
 
-```markdown
+```text
 # Toram Database Search
 
 Deterministic Streamlit search for Toram Online items and skills.
 
 ## Run locally
+```
+
+Then add this shell block:
 
 ```bash
 python -m pip install -r requirements-dev.txt
 streamlit run main.py
 ```
 
+Continue README text:
+
+```text
 ## Database update workflow
 
 The canonical databases are maintained in `KarenYuusha/filter_search`.
 Replace the Streamlit copies with:
+```
+
+Then add:
 
 ```bash
 cp ../filter_search/coryn_data/database/items.sqlite ./items.sqlite
 cp ../filter_search/coryn_data/database/skills.sqlite ./skills.sqlite
 ```
 
+Continue:
+
+```text
 Then run:
+```
+
+Then add:
 
 ```bash
 pytest -q
@@ -668,6 +695,9 @@ git commit -m "data: update Toram databases"
 git push
 ```
 
+Finish README with:
+
+```text
 The Streamlit app reads these files only; it never edits or rebuilds them.
 
 ## Deployment
@@ -676,11 +706,11 @@ Streamlit Community Cloud entry point: `main.py`.
 Public deployment: `https://toram-item-search.streamlit.app/`.
 ```
 
-Do not describe `filter_search` as the deployment repository.
+Do not describe `filter_search` as the deployed repository.
 
-- [ ] **Step 2: Add an AppTest guard for no startup exception**
+- [ ] **Step 2: Keep a startup regression test**
 
-Ensure `tests/test_app_shell.py` contains:
+Ensure:
 
 ```python
 def test_app_has_no_startup_exception() -> None:
@@ -694,11 +724,9 @@ def test_app_has_no_startup_exception() -> None:
 pytest -q
 ```
 
-Expected: all tests pass.
+Expected: all pass.
 
 - [ ] **Step 4: Check forbidden runtime dependencies**
-
-Run:
 
 ```bash
 python - <<'PY'
@@ -722,7 +750,7 @@ git commit -m "docs: document Streamlit deployment workflow"
 
 ## Phase Verification Checklist
 
-Run all of the following before starting the item-search plan:
+Before starting item search:
 
 ```bash
 pytest -q
@@ -734,7 +762,7 @@ print(health)
 PY
 ```
 
-Then manually launch:
+Then launch manually:
 
 ```bash
 streamlit run main.py --server.headless true
@@ -743,19 +771,21 @@ streamlit run main.py --server.headless true
 Verify:
 
 - page title is `Toram Database`;
-- sidebar defaults to `Universal` and offers `Items` and `Skills`;
-- both packaged databases validate;
+- sidebar defaults to Universal and offers Items and Skills;
+- both packaged DBs validate;
 - no search is attempted yet;
 - no LLM/Discord service starts;
-- changing sidebar mode does not mutate either SQLite file.
+- changing sidebar mode cannot mutate either SQLite file.
 
 ## Reference Sources in `filter_search`
 
-Use these only as schema/reference material; do not modify them for this Streamlit phase:
+Use these only as source/schema reference material:
 
-- `coryn_data/database/items.sqlite`
-- `coryn_data/database/skills.sqlite`
-- `toram_data/repository.py` for the canonical item schema
-- `toram_skills/schema.py` for the canonical skill schema
+```text
+coryn_data/database/items.sqlite
+coryn_data/database/skills.sqlite
+toram_data/repository.py
+toram_skills/schema.py
+```
 
-The Streamlit validation intentionally excludes editor-only item tables and `skill_embedding_vectors`, because neither is required by the deterministic public website.
+The target validation intentionally excludes editor-only item tables and `skill_embedding_vectors`, because neither is required by the deterministic public website.
