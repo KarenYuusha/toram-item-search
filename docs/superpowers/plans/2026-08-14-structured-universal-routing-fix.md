@@ -22,15 +22,15 @@
 
 ## File Structure
 
-- `toram_search/items/models.py` — add the explicit routing-confidence type/field carried by `ItemSearchOutcome`.
-- `toram_search/items/filters.py` — resolve specific crysta-slot phrases in either word order before generic item-type aliases.
-- `toram_search/items/service.py` — mark item outcomes with routing confidence and block fuzzy item-name fallback after recognized structured intent.
-- `toram_search/skills/service.py` — add a public search policy parameter that disables fuzzy/FTS fallback while preserving exact and structured routes.
-- `toram_search/router.py` — use item routing confidence to decide whether Universal skill search may use weak fallback.
-- `tests/item_db_factory.py` — add representative Weapon Crysta data needed for deterministic regression coverage.
-- `tests/test_item_search.py` — cover crysta-slot alias precedence, routing confidence, and no structured-to-fuzzy degradation.
-- `tests/test_skill_search.py` — cover strict skill search and Skills-only fallback preservation.
-- `tests/test_universal.py` — cover the exact `aggro xtal wp` production bug and cross-domain routing behavior.
+- `toram_search/items/models.py` — add explicit routing confidence to `ItemSearchOutcome`.
+- `toram_search/items/filters.py` — resolve specific crysta-slot phrases in either word order before generic aliases.
+- `toram_search/items/service.py` — mark routing confidence and prevent structured queries from degrading into fuzzy item-name search.
+- `toram_search/skills/service.py` — allow callers to disable only fuzzy/FTS fallback.
+- `toram_search/router.py` — apply strict skill routing in Universal mode when item confidence is strong.
+- `tests/item_db_factory.py` — add representative Weapon Crysta and unrelated Dagger fixtures.
+- `tests/test_item_search.py` — cover confidence, alias precedence, and no fuzzy degradation.
+- `tests/test_skill_search.py` — cover strict skill routing while preserving strong routes.
+- `tests/test_universal.py` — cover the production regression and cross-domain behavior.
 
 ---
 
@@ -44,18 +44,13 @@
 **Interfaces:**
 - Produces: `RoutingConfidence = Literal['strong', 'weak', 'none']`.
 - Produces: `ItemSearchOutcome.routing_confidence: RoutingConfidence = 'none'`.
-- Strong outcomes include exact item matches, recognized stat/item-filter/expression/rank intent, deterministic clarifications/suggestions produced from recognized item syntax, and item help/meta/refusal routes.
-- Weak outcomes are fuzzy item-name matches only.
-- None covers empty/not-found input with no recognized item intent.
+- Strong: exact item, recognized stat/filter/rank/expression, recognized item clarification/suggestion, help/meta/refusal.
+- Weak: fuzzy item-name results only.
+- None: empty or fully unrecognized query.
 
-- [ ] **Step 1: Write failing routing-confidence tests**
-
-Add tests that assert exact/structured item intent is `strong`, fuzzy name matching is `weak`, and a fully unknown query is `none`:
+- [ ] **Step 1: Write the failing confidence test**
 
 ```python
-from toram_search.items.service import ItemSearchService
-
-
 def test_item_routing_confidence_distinguishes_strong_weak_and_none(tmp_path: Path) -> None:
     path = tmp_path / 'items.sqlite'
     create_item_database(path)
@@ -69,19 +64,15 @@ def test_item_routing_confidence_distinguishes_strong_weak_and_none(tmp_path: Pa
         service.close()
 ```
 
-- [ ] **Step 2: Run the new test and verify RED**
-
-Run:
+- [ ] **Step 2: Run the test and verify RED**
 
 ```bash
 python -m pytest -q tests/test_item_search.py::test_item_routing_confidence_distinguishes_strong_weak_and_none
 ```
 
-Expected: FAIL because `ItemSearchOutcome` has no `routing_confidence` field.
+Expected: FAIL because `routing_confidence` does not exist.
 
 - [ ] **Step 3: Add the model field**
-
-In `toram_search/items/models.py` add:
 
 ```python
 RoutingConfidence = Literal['strong', 'weak', 'none']
@@ -96,31 +87,35 @@ class ItemSearchOutcome:
     routing_confidence: RoutingConfidence = 'none'
 ```
 
-- [ ] **Step 4: Mark service return paths explicitly**
+- [ ] **Step 4: Apply the exact confidence mapping in `ItemSearchService.search()`**
 
-Update `ItemSearchService.search()` return paths so:
+Keep every existing message/result payload unchanged and append only the confidence value according to this mapping:
+
+```text
+empty query                                      -> none
+help / meta / subjective refusal                 -> strong
+upgrade exact or upgrade fuzzy crysta result     -> strong
+upgrade no-match                                 -> strong
+exact item-name result                           -> strong
+ambiguous stat clarification                     -> strong
+recognized stat/filter result or no-match        -> strong
+recognized expression result / parse suggestion  -> strong
+recognized multi-stat suggestion                 -> strong
+final fuzzy item-name result                     -> weak
+final unrecognized not-found                     -> none
+```
+
+Concrete constructor forms for the changed categories:
 
 ```python
-# examples of strong intent
-ItemSearchOutcome('results', raw, results, routing_confidence='strong')
-ItemSearchOutcome('clarify', raw, message=..., suggested_queries=..., routing_confidence='strong')
-ItemSearchOutcome('suggest', raw, message=..., suggested_queries=..., routing_confidence='strong')
 ItemSearchOutcome('help', raw, message=_HELP, routing_confidence='strong')
-ItemSearchOutcome('meta', raw, message=..., routing_confidence='strong')
-ItemSearchOutcome('refuse', raw, message=..., routing_confidence='strong')
-
-# fuzzy item-name fallback only
-ItemSearchOutcome('results', raw, fuzzy_cards, routing_confidence='weak')
-
-# no recognized intent
+ItemSearchOutcome('refuse', raw, message='This search only compares objective database fields; subjective build/tank/DPS recommendations are not supported.', routing_confidence='strong')
+ItemSearchOutcome('results', raw, tuple(ItemCardResult(x, score=100, match_kind='exact') for x in exact), routing_confidence='strong')
+ItemSearchOutcome('results', raw, tuple(ItemCardResult(i, score=s, match_kind=k) for i, s, k in ranked), routing_confidence='weak')
 ItemSearchOutcome('not_found', raw, message='No matching item or stat found.', routing_confidence='none')
 ```
 
-Exact item-name results must be `strong` even though they are not stat-filter queries.
-
-- [ ] **Step 5: Run the targeted test and related item tests**
-
-Run:
+- [ ] **Step 5: Run all item tests**
 
 ```bash
 python -m pytest -q tests/test_item_search.py
@@ -137,7 +132,7 @@ git commit -m "fix: expose item routing confidence"
 
 ---
 
-### Task 2: Parse order-insensitive crysta-slot filters and prevent structured fuzzy degradation
+### Task 2: Parse order-insensitive crysta-slot filters and block structured fuzzy degradation
 
 **Files:**
 - Modify: `tests/item_db_factory.py`
@@ -146,36 +141,29 @@ git commit -m "fix: expose item routing confidence"
 - Test: `tests/test_item_search.py`
 
 **Interfaces:**
-- Existing `extract_item_filter(text, available_item_types)` remains the public filter API.
-- Specific multi-token crysta-slot aliases must win over generic `xtal`, `weapon`, and `wp` aliases.
-- `aggro xtal wp`, `aggro wp xtal`, and `aggro weapon xtal` must all leave only `aggro` as the stat text and resolve to Weapon Crysta types.
+- Keep `extract_item_filter(text, available_item_types)` unchanged.
+- Specific two-token crysta-slot aliases must win over generic `xtal`, `weapon`, and `wp`.
+- `aggro xtal wp`, `aggro wp xtal`, and `aggro weapon xtal` must resolve to Weapon Crysta and leave `aggro` for stat parsing.
 
-- [ ] **Step 1: Add representative Weapon Crysta fixtures**
+- [ ] **Step 1: Extend the test item fixture**
 
-Extend `tests/item_db_factory.py` with two items and stats:
+Add to `items`:
 
 ```python
 (7, 1, 'Aggro Weapon Crystal', 'Weapon Crysta', 100, None, None, None, None, None, 'https://example.com/weapon-crysta', ''),
 (8, 1, 'Unrelated Dagger', 'Dagger', 100, None, None, None, None, None, 'https://example.com/dagger', ''),
 ```
 
-and:
+Add to `stats`:
 
 ```python
 (8, 7, 0, 'Aggro %', 15, '[]', None, None, 0),
 (9, 8, 0, 'Critical Rate', 1, '[]', None, None, 0),
 ```
 
-Keep IDs unique relative to the existing fixture rows.
-
-- [ ] **Step 2: Write failing alias-precedence tests**
-
-Add:
+- [ ] **Step 2: Write failing alias and production-query tests**
 
 ```python
-from toram_search.items.filters import extract_item_filter
-
-
 def test_specific_crysta_slot_aliases_are_order_insensitive(tmp_path: Path) -> None:
     path = tmp_path / 'items.sqlite'
     create_item_database(path)
@@ -190,11 +178,8 @@ def test_specific_crysta_slot_aliases_are_order_insensitive(tmp_path: Path) -> N
             assert remaining == 'aggro'
     finally:
         service.close()
-```
 
-Also add direct search regression:
 
-```python
 def test_aggro_xtal_wp_returns_weapon_crysta_not_fuzzy_item(tmp_path: Path) -> None:
     path = tmp_path / 'items.sqlite'
     create_item_database(path)
@@ -208,21 +193,17 @@ def test_aggro_xtal_wp_returns_weapon_crysta_not_fuzzy_item(tmp_path: Path) -> N
         service.close()
 ```
 
-- [ ] **Step 3: Run the new item regressions and verify RED**
-
-Run:
+- [ ] **Step 3: Run both tests and verify RED**
 
 ```bash
-python -m pytest -q \
-  tests/test_item_search.py::test_specific_crysta_slot_aliases_are_order_insensitive \
-  tests/test_item_search.py::test_aggro_xtal_wp_returns_weapon_crysta_not_fuzzy_item
+python -m pytest -q tests/test_item_search.py::test_specific_crysta_slot_aliases_are_order_insensitive tests/test_item_search.py::test_aggro_xtal_wp_returns_weapon_crysta_not_fuzzy_item
 ```
 
-Expected: FAIL because `xtal wp` is currently split by generic aliases.
+Expected: FAIL because generic `xtal` currently wins before the intended combined filter is represented.
 
-- [ ] **Step 4: Add explicit specific aliases before generic aliases**
+- [ ] **Step 4: Add the complete specific alias set**
 
-In `toram_search/items/filters.py`, extend the `special` mapping so all supported orderings are first-class candidate phrases:
+Replace the current `special` mapping in `_candidates()` with:
 
 ```python
 special = {
@@ -250,11 +231,9 @@ special = {
 }
 ```
 
-Keep `_candidates()` sorting longest phrases first so the two-token specific aliases beat one-token generic aliases.
+Keep the existing longest-phrase-first sort so two-token aliases beat one-token aliases.
 
-- [ ] **Step 5: Write a failing structured-leftover regression**
-
-Add a test that proves recognized structured intent cannot fall back to a fuzzy item name:
+- [ ] **Step 5: Write the failing leftover-token test**
 
 ```python
 def test_structured_item_intent_with_unknown_leftover_does_not_fuzzy_match(tmp_path: Path) -> None:
@@ -270,31 +249,30 @@ def test_structured_item_intent_with_unknown_leftover_does_not_fuzzy_match(tmp_p
         service.close()
 ```
 
-- [ ] **Step 6: Run the leftover regression and verify RED**
-
-Run:
+- [ ] **Step 6: Run the leftover-token test and verify RED**
 
 ```bash
 python -m pytest -q tests/test_item_search.py::test_structured_item_intent_with_unknown_leftover_does_not_fuzzy_match
 ```
 
-Expected: FAIL if the service still reaches `repository.fuzzy_items(raw)` after recognizing the item filter.
+Expected: FAIL if the final fuzzy item-name fallback is still reachable after recognizing structured intent.
 
-- [ ] **Step 7: Block fuzzy fallback after structured intent**
+- [ ] **Step 7: Track recognized structured intent from parsed values**
 
-In `ItemSearchService.search()`, compute a deterministic flag after item-filter/rank/expression detection:
+After `item_filter`, ranking detection, `stat_hits`, `looks_expression`, `stat`, and `choices` have been computed, define:
 
 ```python
 recognized_structured_intent = bool(
     item_filter is not None
     or rank_direction is not None
     or looks_expression
-    or any(alias in tokens for alias in STAT_ALIASES)
-    or any(alias.split() and all(t in tokens for t in alias.split()) for alias in ('crit', 'crt'))
+    or stat is not None
+    or choices
+    or stat_hits
 )
 ```
 
-Use the already-resolved `stat`, `choices`, `stat_hits`, `item_filter`, and expression flags rather than introducing fuzzy heuristics. Immediately before the final `repository.fuzzy_items(raw)` fallback:
+Immediately before the final `repository.fuzzy_items(raw)` fallback add:
 
 ```python
 if recognized_structured_intent:
@@ -306,11 +284,9 @@ if recognized_structured_intent:
     )
 ```
 
-If implementation can express `recognized_structured_intent` more directly from existing parsed values, prefer that over rescanning raw text.
+All successful recognized stat/filter/expression return paths in this section must carry `routing_confidence='strong'` from Task 1.
 
 - [ ] **Step 8: Run all item tests**
-
-Run:
 
 ```bash
 python -m pytest -q tests/test_item_search.py
@@ -335,12 +311,10 @@ git commit -m "fix: parse structured crysta slot queries"
 
 **Interfaces:**
 - Change public method to `SkillSearchService.search(query: str, *, allow_weak_fallback: bool = True) -> SkillSearchOutcome`.
-- All exact, compare, tree, structured filter, ailment, MP-ranking, and exact skill-name routes execute regardless of `allow_weak_fallback`.
-- Only fuzzy skill-name matching and `lexical_search(...)` are skipped when `allow_weak_fallback=False`.
+- Exact skill/alias, compare, tree, structured filters, ailment, MP ranking, and other current strong routes remain active when strict.
+- Only RapidFuzz skill-name fallback and `lexical_search()` are disabled when strict.
 
 - [ ] **Step 1: Write failing strict-mode tests**
-
-Add tests:
 
 ```python
 def test_skill_search_can_disable_weak_fallback(tmp_path: Path) -> None:
@@ -370,48 +344,57 @@ def test_strict_skill_search_keeps_exact_and_structured_routes(tmp_path: Path) -
         service.close()
 ```
 
-- [ ] **Step 2: Run the new tests and verify RED**
-
-Run:
+- [ ] **Step 2: Run both tests and verify RED**
 
 ```bash
-python -m pytest -q \
-  tests/test_skill_search.py::test_skill_search_can_disable_weak_fallback \
-  tests/test_skill_search.py::test_strict_skill_search_keeps_exact_and_structured_routes
+python -m pytest -q tests/test_skill_search.py::test_skill_search_can_disable_weak_fallback tests/test_skill_search.py::test_strict_skill_search_keeps_exact_and_structured_routes
 ```
 
 Expected: FAIL because `allow_weak_fallback` is not accepted.
 
-- [ ] **Step 3: Add the search policy parameter**
+- [ ] **Step 3: Add the policy parameter and exact weak-fallback gate**
 
-Change the signature:
+Change the signature to:
 
 ```python
 def search(self, query: str, *, allow_weak_fallback: bool = True) -> SkillSearchOutcome:
 ```
 
-After all strong routes and `resolve_skill_name(raw)`, gate only the weak section:
+Keep every route through `exact=self.repository.resolve_skill_name(raw)` unchanged. Replace the current final fuzzy/lexical section with this complete block:
 
 ```python
 if not allow_weak_fallback:
     return SkillSearchOutcome('not_found', raw, message='No matching skill database information found.')
 
 fuzzy = []
-# existing RapidFuzz block unchanged
-...
+for s in self.repository.all_skills():
+    score = max(
+        float(fuzz.WRatio(norm, s.normalized_name)),
+        float(fuzz.token_set_ratio(norm, s.normalized_name)),
+    )
+    if score >= 88:
+        fuzzy.append((score, s))
+if fuzzy:
+    fuzzy.sort(key=lambda x: (-x[0], x[1].normalized_name, x[1].id))
+    return SkillSearchOutcome('results', raw, self._cards(tuple(s for _, s in fuzzy[:20])))
+
 hits = lexical_search(self.repository, raw, limit=20)
-# existing lexical block unchanged
+if hits:
+    return SkillSearchOutcome(
+        'results',
+        raw,
+        self._cards(tuple(self.repository.get_skill(h.skill_id) for h in hits)),
+    )
+return SkillSearchOutcome('not_found', raw, message='No matching skill database information found.')
 ```
 
 - [ ] **Step 4: Run all skill tests**
-
-Run:
 
 ```bash
 python -m pytest -q tests/test_skill_search.py
 ```
 
-Expected: PASS, proving the default remains backward-compatible.
+Expected: PASS; default behavior remains unchanged.
 
 - [ ] **Step 5: Commit**
 
@@ -429,13 +412,11 @@ git commit -m "fix: support strict skill routing"
 - Modify: `tests/test_universal.py`
 
 **Interfaces:**
-- `_search_skills(query, path, *, allow_weak_fallback=True)` forwards the policy to `SkillSearchService.search()`.
-- Universal mode searches items first, then calls skills with `allow_weak_fallback = items.routing_confidence != 'strong'`.
-- Items-only and Skills-only behavior remains unchanged.
+- `_search_skills(query, path, *, allow_weak_fallback=True)` forwards the policy.
+- Universal mode searches items first and disables weak skill fallback exactly when `items.routing_confidence == 'strong'`.
+- Items-only and Skills-only routing remain independent.
 
-- [ ] **Step 1: Write the exact production regression**
-
-Add:
+- [ ] **Step 1: Write the exact production regressions**
 
 ```python
 def test_universal_aggro_xtal_wp_returns_weapon_crysta_without_unrelated_skills(tmp_path: Path) -> None:
@@ -447,23 +428,20 @@ def test_universal_aggro_xtal_wp_returns_weapon_crysta_without_unrelated_skills(
     assert outcome.skills is not None
     assert outcome.skills.kind == 'not_found'
     assert not outcome.skills.results
-```
 
-Add equivalent word-order coverage:
 
-```python
 def test_universal_aggro_wp_xtal_matches_same_weapon_crysta(tmp_path: Path) -> None:
     items, skills = databases(tmp_path)
     a = search_database('Universal', 'aggro xtal wp', items_path=items, skills_path=skills)
     b = search_database('Universal', 'aggro wp xtal', items_path=items, skills_path=skills)
+    assert a.items is not None and b.items is not None
+    assert a.skills is not None and b.skills is not None
     assert [row.item.id for row in a.items.results] == [row.item.id for row in b.items.results]
     assert not a.skills.results
     assert not b.skills.results
 ```
 
 - [ ] **Step 2: Write cross-domain preservation tests**
-
-Add:
 
 ```python
 def test_universal_strong_item_intent_suppresses_only_weak_skill_fallback(tmp_path: Path) -> None:
@@ -481,19 +459,17 @@ def test_universal_exact_skill_match_survives_strict_skill_policy(tmp_path: Path
     assert [row.skill.name for row in outcome.skills.results] == ['Guardian']
 ```
 
-- [ ] **Step 3: Run Universal regressions and verify RED**
-
-Run:
+- [ ] **Step 3: Run Universal tests and verify RED**
 
 ```bash
 python -m pytest -q tests/test_universal.py
 ```
 
-Expected: FAIL because Universal currently always gives skill search full weak fallback.
+Expected: FAIL because Universal currently always grants the skill service weak fallback.
 
 - [ ] **Step 4: Implement confidence-aware routing**
 
-Update helper:
+Replace `_search_skills` with:
 
 ```python
 def _search_skills(query: str, path: Path, *, allow_weak_fallback: bool = True):
@@ -504,7 +480,7 @@ def _search_skills(query: str, path: Path, *, allow_weak_fallback: bool = True):
         service.close()
 ```
 
-Update `search_database()` so Universal is intentionally ordered:
+Replace the body of `search_database()` after its signature with:
 
 ```python
 if mode == 'Universal':
@@ -517,14 +493,20 @@ if mode == 'Universal':
     return UniversalSearchOutcome(query=query, items=items, skills=skills)
 
 if mode == 'Items':
-    return UniversalSearchOutcome(query=query, items=_search_items(query, items_path), skills=None)
+    return UniversalSearchOutcome(
+        query=query,
+        items=_search_items(query, items_path),
+        skills=None,
+    )
 
-return UniversalSearchOutcome(query=query, items=None, skills=_search_skills(query, skills_path))
+return UniversalSearchOutcome(
+    query=query,
+    items=None,
+    skills=_search_skills(query, skills_path),
+)
 ```
 
-- [ ] **Step 5: Run Universal, item, and skill suites together**
-
-Run:
+- [ ] **Step 5: Run item, skill, and Universal tests together**
 
 ```bash
 python -m pytest -q tests/test_item_search.py tests/test_skill_search.py tests/test_universal.py
@@ -545,18 +527,17 @@ git commit -m "fix: suppress weak cross-domain skill matches"
 
 **Files:**
 - No production changes expected.
-- Modify tests only if a failing test reveals a real uncovered compatibility requirement; do not weaken the new regressions.
 
 **Interfaces:**
-- Final behavior must satisfy all Global Constraints and all four earlier task contracts.
+- Final behavior must satisfy all Global Constraints and Tasks 1–4.
 
-- [ ] **Step 1: Run the complete test suite**
+- [ ] **Step 1: Run the complete suite**
 
 ```bash
 python -m pytest -q
 ```
 
-Expected: all tests pass, including the exact `aggro xtal wp` regression.
+Expected: zero failures, including the exact `aggro xtal wp` regression.
 
 - [ ] **Step 2: Compile application Python sources**
 
@@ -568,11 +549,11 @@ Expected: exit code 0.
 
 - [ ] **Step 3: Verify database files are unchanged**
 
-Compare the feature branch against its base and confirm `items.sqlite` and `skills.sqlite` are absent from the changed-file list.
+Compare the implementation branch against its base and confirm neither `items.sqlite` nor `skills.sqlite` appears in the changed-file list.
 
 - [ ] **Step 4: Verify scope**
 
-Expected changed production paths are limited to:
+Expected production paths are limited to:
 
 ```text
 toram_search/items/models.py
@@ -582,13 +563,12 @@ toram_search/skills/service.py
 toram_search/router.py
 ```
 
-plus the test fixture/tests and approved spec/plan documents.
+Allowed non-production changes are the approved spec/plan, `tests/item_db_factory.py`, and the three targeted test files.
 
-- [ ] **Step 5: Commit any final test-only cleanup if required**
+- [ ] **Step 5: Commit test-only cleanup only if required by a real compatibility failure**
 
-If no cleanup is required, do not create an empty commit. If test-only cleanup is required:
+If no cleanup is required, create no commit. If a real compatibility failure requires test-only cleanup, stage only the affected test files and commit with:
 
 ```bash
-git add tests/
 git commit -m "test: finalize structured routing regressions"
 ```
