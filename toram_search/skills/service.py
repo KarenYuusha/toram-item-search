@@ -79,7 +79,7 @@ class SkillSearchService:
         bits.extend(sec.body for sec in s.sections if sec.body)
         if not bits and s.raw_text:bits.append(s.raw_text)
         return '\n\n'.join(bits)
-    def search(self,query:str)->SkillSearchOutcome:
+    def search(self,query:str,*,allow_weak_fallback:bool=True)->SkillSearchOutcome:
         raw=' '.join(str(query).split());norm=normalize_skill_name(raw.strip(' ?!.'))
         if not raw:return SkillSearchOutcome('not_found',raw,message='Enter a skill, tree, ailment, or objective skill query.')
         if _SUBJECTIVE.search(raw):return SkillSearchOutcome('refuse',raw,message='This search compares objective database facts only; subjective DPS/tank/build recommendations are not supported.')
@@ -125,6 +125,8 @@ class SkillSearchService:
             return SkillSearchOutcome('results' if rows else 'not_found',raw,self._cards(rows,'mp_cost_value'))
         exact=self.repository.resolve_skill_name(raw)
         if exact:return SkillSearchOutcome('results',raw,self._cards(exact))
+        if not allow_weak_fallback:
+            return SkillSearchOutcome('not_found',raw,message='No matching skill database information found.')
         fuzzy=[]
         for s in self.repository.all_skills():
             score=max(float(fuzz.WRatio(norm,s.normalized_name)),float(fuzz.token_set_ratio(norm,s.normalized_name)))
