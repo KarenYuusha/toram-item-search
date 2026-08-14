@@ -229,3 +229,104 @@ def test_parser_classifies_exact_item(tmp_path: Path) -> None:
         parsed = parse_search_query('Test Bow', repository)
     assert parsed.intent == 'exact_item'
     assert parsed.item_id == 1
+
+
+def test_item_interpretation_for_aggro_weapon_crysta_is_canonical_and_removable(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    try:
+        outcome = service.search('aggro xtal wp')
+    finally:
+        service.close()
+    interpretation = outcome.interpretation
+    assert interpretation is not None
+    assert [(c.kind, c.label) for c in interpretation.chips] == [
+        ('stat', 'Aggro %'),
+        ('item_type', 'Weapon Crysta'),
+    ]
+    item_type = next(c for c in interpretation.chips if c.kind == 'item_type')
+    stat = next(c for c in interpretation.chips if c.kind == 'stat')
+    assert interpretation.query_without(item_type.id) == 'aggro'
+    assert interpretation.query_without(stat.id) == 'weapon xtal'
+
+
+def test_rank_chip_depends_on_stat_and_reconstructs_canonically(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    try:
+        outcome = service.search('highest cr bow')
+    finally:
+        service.close()
+    interpretation = outcome.interpretation
+    assert interpretation is not None
+    assert [(c.kind, c.label) for c in interpretation.chips] == [
+        ('rank', 'Highest'), ('stat', 'Critical Rate'), ('item_type', 'Bow'),
+    ]
+    rank = next(c for c in interpretation.chips if c.kind == 'rank')
+    stat = next(c for c in interpretation.chips if c.kind == 'stat')
+    item_type = next(c for c in interpretation.chips if c.kind == 'item_type')
+    assert rank.depends_on == ('stat',)
+    assert interpretation.query_without(rank.id) == 'critical rate bow'
+    assert interpretation.query_without(stat.id) == 'bow'
+    assert interpretation.query_without(item_type.id) == 'highest critical rate'
+
+
+def test_numeric_comparison_is_one_atomic_chip(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    try:
+        outcome = service.search('hp >= 5000 armor')
+    finally:
+        service.close()
+    interpretation = outcome.interpretation
+    assert interpretation is not None
+    assert [(c.kind, c.label) for c in interpretation.chips] == [
+        ('numeric_stat', 'MaxHP ≥ 5000'), ('item_type', 'Armor'),
+    ]
+    assert interpretation.query_without(interpretation.chips[0].id) == 'armor'
+
+
+def test_boolean_expression_removal_rebuilds_from_ast(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    try:
+        outcome = service.search('hp > 5000 and cr bow')
+    finally:
+        service.close()
+    interpretation = outcome.interpretation
+    assert interpretation is not None
+    hp_chip = next(c for c in interpretation.chips if c.label == 'MaxHP > 5000')
+    cr_chip = next(c for c in interpretation.chips if c.label == 'Critical Rate')
+    assert interpretation.query_without(hp_chip.id) == 'critical rate bow'
+    assert interpretation.query_without(cr_chip.id) == 'maxhp > 5000 bow'
+
+
+def test_or_expression_removal_drops_empty_or_group(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    try:
+        outcome = service.search('hp > 5000 or cr bow')
+    finally:
+        service.close()
+    interpretation = outcome.interpretation
+    assert interpretation is not None
+    hp_chip = next(c for c in interpretation.chips if c.label == 'MaxHP > 5000')
+    assert interpretation.query_without(hp_chip.id) == 'critical rate bow'
+
+
+def test_unsafe_item_suggestion_has_no_interpretation(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    try:
+        outcome = service.search('crit bow hp')
+    finally:
+        service.close()
+    assert outcome.kind in {'suggest', 'clarify'}
+    assert outcome.interpretation is None
+
+
+def test_exact_and_fuzzy_item_routes_have_quality_but_no_chips(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    try:
+        exact = service.search('Test Bow')
+        fuzzy = service.search('Test Bo')
+    finally:
+        service.close()
+    assert exact.route_quality.family == 'exact'
+    assert exact.interpretation is None
+    assert fuzzy.route_quality.family == 'weak'
+    assert fuzzy.interpretation is None
