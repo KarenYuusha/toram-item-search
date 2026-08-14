@@ -198,7 +198,7 @@ If both domains are at the same priority level, deterministic match quality brea
 
 Universal mode exposes at most one interpretation group under the search bar. The UI does not display duplicate Items/Skills interpretation rows.
 
-Exact names themselves are not rendered as chips even if an exact-name route contributes to routing quality.
+Exact names themselves are not rendered as chips even if an exact-name route contributes to routing quality. If the winning domain has no chip-eligible structured filters, the UI renders no interpretation chips; it must not fall back to the losing domain merely because that domain has chips available.
 
 ## Visibility Rules
 
@@ -315,7 +315,8 @@ Add tests proving:
 - exact/structured-with-results outranks exact/structured-without-results;
 - structured routes outrank weak fuzzy/FTS routes;
 - raw result count cannot override a higher-quality route;
-- tie-breaking is deterministic.
+- tie-breaking is deterministic;
+- a winning route with no chip-eligible structured filters produces no chips rather than exposing the losing domain's interpretation.
 
 ### Streamlit behavior tests
 
@@ -343,8 +344,9 @@ The feature is complete when all of the following are true:
 5. Removing a parent filter also removes dependent filters such as rank when required.
 6. Chip removal updates the search field, clears stale results/chips, and performs no database search until explicit submission.
 7. Universal mode shows only the strongest domain interpretation using deterministic quality rules rather than result count.
-8. The interpretation metadata comes from the same deterministic parsing path that drove the search.
-9. Existing correction/example fill-only behavior remains unchanged.
-10. Existing item and skill search semantics remain unchanged except for exposing interpretation metadata.
-11. All automated tests and Python compilation checks pass.
-12. `items.sqlite` and `skills.sqlite` remain unchanged.
+8. If Universal mode's winning route has no eligible structured chips, no chips are shown and the losing domain is not used as a fallback.
+9. The interpretation metadata comes from the same deterministic parsing path that drove the search.
+10. Existing correction/example fill-only behavior remains unchanged.
+11. Existing item and skill search semantics remain unchanged except for exposing interpretation metadata.
+12. All automated tests and Python compilation checks pass.
+13. `items.sqlite` and `skills.sqlite` remain unchanged.
