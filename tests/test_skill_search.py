@@ -121,3 +121,26 @@ def test_required_level_max_filter(tmp_path: Path) -> None:
     try: outcome=service.search('skills required level <= 20')
     finally: service.close()
     assert [row.skill.name for row in outcome.results] == ['Hard Hit','Shield Bash']
+
+
+def test_skill_search_can_disable_weak_fallback(tmp_path: Path) -> None:
+    service=make_service(tmp_path)
+    try:
+        weak=service.search('protect party aura')
+        strict=service.search('protect party aura',allow_weak_fallback=False)
+    finally:
+        service.close()
+    assert weak.results
+    assert strict.kind == 'not_found'
+    assert not strict.results
+
+
+def test_strict_skill_search_keeps_exact_and_structured_routes(tmp_path: Path) -> None:
+    service=make_service(tmp_path)
+    try:
+        exact=service.search('Guardian',allow_weak_fallback=False)
+        ailment=service.search('skills that inflict stun',allow_weak_fallback=False)
+    finally:
+        service.close()
+    assert [row.skill.name for row in exact.results] == ['Guardian']
+    assert [row.skill.name for row in ailment.results] == ['Shield Bash']
