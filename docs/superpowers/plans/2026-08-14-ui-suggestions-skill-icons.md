@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Target repository is only `KarenYuusha/toram-item-search`.
-- `KarenYuusha/filter_search` is source/reference-only and must not be modified by this work.
+- `KarenYuusha/filter_search` is source/reference-only and must not be modified.
 - Copy `filter_search/coryn_skill_icons/` into root-level `toram-item-search/coryn_skill_icons/`.
 - Do not add icon fields or presentation metadata to `skills.sqlite`.
 - Do not add LLM, RAG, semantic-search, embedding, Discord, or runtime cross-repository dependencies.
@@ -29,23 +29,23 @@
 
 - `coryn_skill_icons/` — exact checked-in copy of the canonical source icon tree.
 - `toram_search/skill_icons.py` — frontend-neutral deterministic icon resolver.
-- `tests/test_skill_icons.py` — resolver unit tests plus one real checked-in asset smoke test.
+- `tests/test_skill_icons.py` — resolver tests plus a real checked-in asset smoke test.
 
 **Modify**
 
 - `main.py` — examples above search, fill-only state updates, correction fill coordination.
-- `ui/results.py` — clickable correction suggestions that return the selected fill value.
+- `ui/results.py` — clickable correction suggestions that return a selected fill value.
 - `ui/skill_cards.py` — individual skill thumbnail rendering.
 - `ui/skill_dialog.py` — individual skill icon in the detail dialog.
-- `tests/test_ui_contract.py` — page ordering and fill-only source contracts.
-- `tests/test_app_shell.py` — AppTest coverage for top example fill-only behavior where supported.
+- `tests/test_ui_contract.py` — ordering/fill-only/icon contracts.
+- `tests/test_app_shell.py` — AppTest coverage for top example fill-only behavior.
 
-**Do not modify**
+**Do not modify unless a failing regression proves it necessary**
 
-- `skills.sqlite`
+- `components/autocomplete_search/index.html` — it already accepts an external `value` and emits only nonce-backed `submit` events for Enter/Search.
 - `items.sqlite`
-- deterministic item/skill parser and search behavior, except where existing suggestion strings are consumed by the UI.
-- `components/autocomplete_search/index.html` unless a failing regression proves the existing external `value` synchronization is insufficient.
+- `skills.sqlite`
+- deterministic item/skill parser behavior.
 
 ---
 
@@ -60,18 +60,18 @@
 - Consumes: local root-level `coryn_skill_icons/`; `tree_name: str`; `skill_name: str`.
 - Produces: `normalize_icon_key(value: str) -> str`; `SkillIconCatalog.resolve(tree_name: str, skill_name: str) -> Path | None`; `DEFAULT_SKILL_ICON_CATALOG`.
 
-- [ ] **Step 1: Copy the canonical icon directory byte-for-byte**
+- [ ] **Step 1: Copy the canonical icon directory**
 
-When both repositories are available locally as sibling checkouts, run:
+When the repositories are sibling checkouts:
 
 ```bash
 rm -rf coryn_skill_icons
 cp -R ../filter_search/coryn_skill_icons ./coryn_skill_icons
 ```
 
-If the source checkout lives elsewhere, use its actual local path but preserve the destination exactly as `./coryn_skill_icons`.
+If the source checkout is elsewhere, use its actual path while preserving the target as `./coryn_skill_icons`.
 
-Verify representative assets exist:
+Verify representative assets:
 
 ```bash
 test -f 'coryn_skill_icons/Shield/Guardian.png'
@@ -79,7 +79,7 @@ test -f 'coryn_skill_icons/Shield/Shield Bash.png'
 find coryn_skill_icons -type f -name '*.png' | sort | head
 ```
 
-Expected: both `test -f` commands exit 0 and the `find` command prints PNG paths.
+Expected: both `test -f` commands exit 0 and PNG paths are printed.
 
 - [ ] **Step 2: Write failing resolver tests**
 
@@ -111,7 +111,7 @@ def test_catalog_applies_existing_tree_folder_aliases(tmp_path: Path) -> None:
     root = tmp_path / "icons"
     folder = root / "MagicBlade"
     folder.mkdir(parents=True)
-    icon = folder / "Magic: Finale.png"
+    icon = folder / "Magic Finale.png"
     icon.write_bytes(b"png")
 
     catalog = SkillIconCatalog(root)
@@ -152,9 +152,7 @@ def test_real_guardian_icon_is_checked_in() -> None:
     assert icon.is_file()
 ```
 
-- [ ] **Step 3: Run the resolver tests and verify they fail before implementation**
-
-Run:
+- [ ] **Step 3: Run the resolver tests and verify red state**
 
 ```bash
 python -m pytest tests/test_skill_icons.py -q
@@ -162,7 +160,7 @@ python -m pytest tests/test_skill_icons.py -q
 
 Expected: FAIL because `toram_search.skill_icons` does not exist yet.
 
-- [ ] **Step 4: Implement the resolver by adapting the proven `filter_search` logic**
+- [ ] **Step 4: Implement the resolver by adapting `filter_search/toram_discord/skill_icons.py`**
 
 Create `toram_search/skill_icons.py`:
 
@@ -257,13 +255,11 @@ DEFAULT_SKILL_ICON_CATALOG = SkillIconCatalog(DEFAULT_SKILL_ICON_ROOT)
 
 - [ ] **Step 5: Run the resolver tests**
 
-Run:
-
 ```bash
 python -m pytest tests/test_skill_icons.py -q
 ```
 
-Expected: all tests PASS.
+Expected: PASS.
 
 - [ ] **Step 6: Commit the assets and resolver**
 
@@ -283,20 +279,18 @@ git commit -m "feat: add individual skill icon catalog"
 - Modify: `tests/test_app_shell.py`
 
 **Interfaces:**
-- Consumes: existing `SearchSubmission(query: str, nonce: int)` from `ui.search.render_search_box`; existing `suggested_queries` tuples on item/skill outcomes.
-- Produces: `_render_message(..., key_prefix: str) -> str | None`; `render_item_results(...) -> str | None`; `render_skill_results(...) -> str | None` where a non-`None` return value is a fill-only query string.
+- Consumes: existing `SearchSubmission(query: str, nonce: int)` from `ui.search.render_search_box`; existing `suggested_queries` tuples.
+- Produces: `_render_message(..., key_prefix: str) -> str | None`; `render_item_results(...) -> str | None`; `render_skill_results(...) -> str | None`.
 - Invariant: only a new `SearchSubmission.nonce` may assign `query_to_run`.
 
-- [ ] **Step 1: Add failing UI-contract tests for ordering and fill-only separation**
+- [ ] **Step 1: Add failing UI-contract tests**
 
 Append to `tests/test_ui_contract.py`:
 
 ```python
 def test_examples_render_before_search_box() -> None:
     source = text("main.py")
-    examples_position = source.index("examples=")
-    search_position = source.index("submission=render_search_box")
-    assert examples_position < search_position
+    assert source.index("examples=") < source.index("submission=render_search_box")
 
 
 def test_examples_are_fill_only_not_query_submissions() -> None:
@@ -305,41 +299,36 @@ def test_examples_are_fill_only_not_query_submissions() -> None:
     assert "query_to_run=example_query" not in source
 
 
-def test_result_corrections_return_fill_value() -> None:
+def test_result_corrections_are_clickable_fill_values() -> None:
     source = text("ui/results.py")
     assert "key_prefix" in source
-    assert "return" in source
     assert "st.button" in source
+    assert "-> str | None" in source
 ```
 
-Add an AppTest regression to `tests/test_app_shell.py` using the existing repository-root `main.py` path pattern already in that file. The test should click one visible example button, rerun the app, and assert the session-state query changes while `last_outcome` stays `None`:
+Append to `tests/test_app_shell.py` using the file's existing `AppTest.from_file(APP_PATH)` pattern:
 
 ```python
 def test_example_button_fills_query_without_searching() -> None:
-    app = app_test()
-    app.run()
+    app = AppTest.from_file(APP_PATH).run(timeout=10)
     target = next(button for button in app.button if button.label == "Guardian")
-    target.click().run()
+    target.click().run(timeout=10)
 
     assert app.session_state["query"] == "Guardian"
     assert app.session_state["last_outcome"] is None
 ```
 
-Use the existing `app_test()` helper/name from `tests/test_app_shell.py`; do not introduce a second AppTest bootstrap helper.
-
-- [ ] **Step 2: Run the targeted UI tests and verify failure**
-
-Run:
+- [ ] **Step 2: Run targeted tests and verify red state**
 
 ```bash
 python -m pytest tests/test_ui_contract.py tests/test_app_shell.py -q
 ```
 
-Expected: FAIL because examples currently execute searches and render below the component, and result suggestions are passive text.
+Expected: FAIL because examples currently execute searches below the component and result suggestions are passive text.
 
-- [ ] **Step 3: Change result suggestion rendering to return a clicked fill value**
+- [ ] **Step 3: Return correction clicks from `ui/results.py` instead of rendering passive text**
 
-Replace the passive suggestion caption in `ui/results.py` with a helper shaped like:
+Implement:
 
 ```python
 def _render_message(
@@ -373,7 +362,7 @@ def _render_message(
     return None
 ```
 
-Update the public renderers so they return the selected fill value:
+Change the two result functions to return that value after rendering cards. Use their current concrete parameter lists:
 
 ```python
 def render_item_results(
@@ -415,7 +404,7 @@ Do not call `search_database` from `ui/results.py`.
 
 - [ ] **Step 4: Move examples above the component and make them fill-only**
 
-In `main.py`, keep the existing mode-specific example tuples but render them before `render_search_box`:
+In `main.py`, render the existing mode-specific example tuples before `render_search_box`:
 
 ```python
 examples = {
@@ -441,22 +430,7 @@ if example_query:
     st.session_state.query = example_query
 ```
 
-Then render the search component with the updated state value:
-
-```python
-submission = render_search_box(
-    value=st.session_state.query,
-    suggestions=suggestions,
-    placeholder=(
-        "Search items, stats, and skills..."
-        if mode == "Universal"
-        else "Search items or stats..."
-        if mode == "Items"
-        else "Search skills or skill trees..."
-    ),
-    disabled=not can_search,
-)
-```
+Then call the existing custom component with `value=st.session_state.query`.
 
 Keep query execution strictly nonce-backed:
 
@@ -467,11 +441,11 @@ if submission is not None and submission.nonce != st.session_state.last_submissi
     query_to_run = submission.query
 ```
 
-There must be no `elif example_query is not None: query_to_run = example_query` branch.
+Delete the current branch that assigns `example_query` to `query_to_run`.
 
 - [ ] **Step 5: Feed correction clicks back into the search field without executing**
 
-In the outcome-rendering block of `main.py`, capture return values independently:
+In `main.py`, capture fill values while rendering stored outcomes:
 
 ```python
 fill_query = None
@@ -483,7 +457,7 @@ if outcome.items is not None:
         limit=st.session_state.item_limit,
     )
     fill_query = fill_query or item_fill
-    # keep existing Show more item behavior unchanged
+    # preserve the existing Show more items block
 
 if outcome.skills is not None:
     skill_fill = render_skill_results(
@@ -491,26 +465,24 @@ if outcome.skills is not None:
         limit=st.session_state.skill_limit,
     )
     fill_query = fill_query or skill_fill
-    # keep existing Show more skill behavior unchanged
+    # preserve the existing Show more skills block
 
 if fill_query:
     st.session_state.query = fill_query
     st.rerun()
 ```
 
-The `st.rerun()` is necessary because corrections are rendered below the search component; it refreshes the component with the new external `value` on the next run. It must not modify `last_submission_nonce`, `last_outcome`, or call `search_database`.
+Do not modify `last_submission_nonce`, `last_outcome`, or call `search_database` in the fill-only branch. The rerun is required because correction buttons render below the search component.
 
-- [ ] **Step 6: Run targeted fill-only tests**
-
-Run:
+- [ ] **Step 6: Run focused fill-only regressions**
 
 ```bash
 python -m pytest tests/test_ui_contract.py tests/test_app_shell.py tests/test_search_component.py -q
 ```
 
-Expected: PASS. Existing component tests must continue proving Tab/click autocomplete acceptance is non-submitting and only Enter/Search emits `event: "submit"`.
+Expected: PASS, including the existing guarantees that autocomplete click/Tab acceptance does not submit.
 
-- [ ] **Step 7: Commit the fill-only interaction change**
+- [ ] **Step 7: Commit the interaction change**
 
 ```bash
 git add main.py ui/results.py tests/test_ui_contract.py tests/test_app_shell.py
@@ -525,14 +497,12 @@ git commit -m "feat: make search suggestions fill only"
 - Modify: `ui/skill_cards.py`
 - Modify: `ui/skill_dialog.py`
 - Modify: `tests/test_ui_contract.py`
-- Modify: `tests/test_skill_icons.py`
 
 **Interfaces:**
 - Consumes: `DEFAULT_SKILL_ICON_CATALOG.resolve(tree_name: str, skill_name: str) -> Path | None`.
-- Produces: skill cards with a small local PNG thumbnail and skill dialogs with the same resolved icon at a larger size.
-- Error behavior: if `resolve(...)` returns `None`, render the existing text-only layout without a broken placeholder.
+- Produces: a small skill-card thumbnail and the same icon at a larger size in the detail dialog.
 
-- [ ] **Step 1: Add failing UI-contract tests for shared icon resolver usage**
+- [ ] **Step 1: Add failing shared-resolver UI tests**
 
 Append to `tests/test_ui_contract.py`:
 
@@ -548,31 +518,29 @@ def test_skill_card_and_dialog_use_shared_icon_catalog() -> None:
     assert "st.image" in dialog_source
 ```
 
-- [ ] **Step 2: Run the targeted tests and verify failure**
-
-Run:
+- [ ] **Step 2: Run targeted tests and verify red state**
 
 ```bash
 python -m pytest tests/test_ui_contract.py tests/test_skill_icons.py -q
 ```
 
-Expected: FAIL because the current Streamlit skill UI does not import or render icons.
+Expected: FAIL because the current skill UI does not render icons.
 
-- [ ] **Step 3: Add the icon to compact skill cards**
+- [ ] **Step 3: Render icons in skill cards**
 
-In `ui/skill_cards.py`, import:
+Import in `ui/skill_cards.py`:
 
 ```python
 from toram_search.skill_icons import DEFAULT_SKILL_ICON_CATALOG
 ```
 
-Inside each card container, resolve once:
+Inside each existing bordered card, resolve once:
 
 ```python
 icon_path = DEFAULT_SKILL_ICON_CATALOG.resolve(card.tree_name, skill.name)
 ```
 
-Render an icon/text split only when an icon exists:
+Use the existing metadata/body logic inside a content container. When an icon exists:
 
 ```python
 if icon_path is not None:
@@ -584,51 +552,25 @@ else:
 
 with content_column:
     st.markdown(f"**{skill.name}**")
-    meta = [card.tree_name]
-    if skill.tier is not None:
-        meta.append(f"Tier {skill.tier}")
-    st.caption(" · ".join(meta))
-
-    facts = []
-    if skill.mp_cost_text:
-        facts.append(f"MP {skill.mp_cost_text}")
-    if skill.required_level is not None:
-        facts.append(f"Lv. {skill.required_level}")
-    if skill.skill_type:
-        facts.append(skill.skill_type)
-    if facts:
-        st.write(" · ".join(facts))
-    if skill.ailments:
-        st.write("Ailment: " + ", ".join(skill.ailments))
-
-    if st.button(
-        "View details",
-        key=f"skill_detail_{skill.id}",
-        use_container_width=True,
-    ):
-        show_skill_dialog(card)
+    # retain the existing tree/tier, MP/level/type, ailment, and View details rendering
 ```
 
-Keep the existing outer two-card row loop and `st.container(border=True)` behavior unchanged.
+Keep the outer two-card-per-row layout unchanged. If no icon resolves, render the same text-only card as today.
 
-- [ ] **Step 4: Add the same icon to the skill detail dialog**
+- [ ] **Step 4: Render the same icon in the skill detail dialog**
 
-In `ui/skill_dialog.py`, import:
+Import in `ui/skill_dialog.py`:
 
 ```python
 from toram_search.skill_icons import DEFAULT_SKILL_ICON_CATALOG
 ```
 
-At the top of `show_skill_dialog`, resolve once:
+At the top of `show_skill_dialog`:
 
 ```python
 skill = card.skill
 icon_path = DEFAULT_SKILL_ICON_CATALOG.resolve(card.tree_name, skill.name)
-```
 
-Render the header as:
-
-```python
 if icon_path is not None:
     icon_column, title_column = st.columns([1, 5], vertical_alignment="center")
     with icon_column:
@@ -639,11 +581,9 @@ else:
     st.subheader(skill.name)
 ```
 
-Keep all existing metadata, metrics, restrictions, descriptions, and sections below this header unchanged.
+Keep all existing metadata, metrics, restrictions, descriptions, game description, and sections unchanged below the header.
 
 - [ ] **Step 5: Run icon UI tests**
-
-Run:
 
 ```bash
 python -m pytest tests/test_skill_icons.py tests/test_ui_contract.py -q
@@ -654,7 +594,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit skill icon rendering**
 
 ```bash
-git add ui/skill_cards.py ui/skill_dialog.py tests/test_ui_contract.py tests/test_skill_icons.py
+git add ui/skill_cards.py ui/skill_dialog.py tests/test_ui_contract.py
 git commit -m "feat: show individual skill icons"
 ```
 
@@ -663,10 +603,10 @@ git commit -m "feat: show individual skill icons"
 ### Task 4: Full Regression and Integration Verification
 
 **Files:**
-- Verify only; modify code only if a failing test exposes a real regression.
+- Verification only; modify code only when a failing check exposes a real defect.
 
 **Interfaces:**
-- Consumes: all changes from Tasks 1–3.
+- Consumes: Tasks 1–3.
 - Produces: a verified branch ready for integration.
 
 - [ ] **Step 1: Run the complete test suite**
@@ -675,26 +615,26 @@ git commit -m "feat: show individual skill icons"
 python -m pytest -q
 ```
 
-Expected: all tests PASS, including existing real-database and custom-component tests.
+Expected: all tests PASS, including real-database and custom-component tests.
 
-- [ ] **Step 2: Compile all Python application sources**
+- [ ] **Step 2: Compile application Python sources**
 
 ```bash
 python -m compileall -q main.py toram_search ui
 ```
 
-Expected: exit code 0 with no compile errors.
+Expected: exit code 0.
 
-- [ ] **Step 3: Run focused source-boundary scans**
+- [ ] **Step 3: Run runtime-boundary scans**
 
 ```bash
 ! grep -R -n -E 'ollama|qwen|gemma|discord|embedding|semantic_search' main.py toram_search ui
 ! grep -R -n -E '\b(INSERT|UPDATE|DELETE|REPLACE)\b' toram_search --include='*.py'
 ```
 
-Expected: both commands exit 0, confirming no prohibited runtime/model stack and no writable SQL was introduced.
+Expected: both commands exit 0.
 
-- [ ] **Step 4: Verify representative checked-in icon resolution manually**
+- [ ] **Step 4: Verify a real copied icon through production resolution**
 
 ```bash
 python - <<'PY'
@@ -708,28 +648,21 @@ assert path.is_file()
 PY
 ```
 
-Expected: prints the local `coryn_skill_icons/Shield/Guardian.png` path and exits 0.
+Expected: prints the local Guardian PNG and exits 0.
 
-- [ ] **Step 5: Review the final diff for scope**
+- [ ] **Step 5: Review final scope**
 
 ```bash
 git diff --stat main...HEAD
 git diff --name-only main...HEAD
 ```
 
-Expected changed content is limited to the approved spec/plan, copied `coryn_skill_icons/`, shared icon resolver/tests, `main.py`, `ui/results.py`, `ui/skill_cards.py`, `ui/skill_dialog.py`, and relevant tests. No `filter_search` files or SQLite schemas are changed.
+Expected: approved spec/plan, copied `coryn_skill_icons/`, shared resolver/tests, `main.py`, `ui/results.py`, `ui/skill_cards.py`, `ui/skill_dialog.py`, and relevant tests only. No SQLite schema changes and no `filter_search` modifications.
 
-- [ ] **Step 6: Run GitHub Actions on the final branch and inspect the result**
+- [ ] **Step 6: Push the implementation branch and inspect GitHub Actions**
 
-Push the branch and confirm the repository's `Tests` workflow completes successfully on Python 3.12, including `python -m pytest -q` and `compileall`.
+Confirm the repository `Tests` workflow completes successfully on Python 3.12 with `python -m pytest -q` and `compileall` both successful.
 
-- [ ] **Step 7: Commit any verification-only test adjustments if they were required**
+- [ ] **Step 7: Commit only genuine verification fixes if required**
 
-Only if Step 1–6 exposed a test-harness issue rather than application behavior:
-
-```bash
-git add tests .github/workflows/test.yml
-git commit -m "test: finalize UI follow-up verification"
-```
-
-If no such adjustment was needed, do not create an empty commit.
+If verification exposed a real test-harness issue, fix it, rerun the affected test plus the full suite, and commit the exact changed files. If no fix was required, do not create an empty commit.
