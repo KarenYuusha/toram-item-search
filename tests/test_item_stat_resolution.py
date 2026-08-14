@@ -23,3 +23,16 @@ def test_multiword_skill_name_is_not_fuzzy_resolved_as_short_item_stat(tmp_path:
 
     assert outcome.route_quality.family != 'structured'
     assert outcome.interpretation is None
+
+
+def test_full_string_stat_typo_still_resolves(tmp_path: Path) -> None:
+    path = tmp_path / 'items.sqlite'
+    create_item_database(path)
+    service = ItemSearchService(path)
+    try:
+        outcome = service.search('critcal rate bow')
+    finally:
+        service.close()
+
+    assert outcome.route_quality.family == 'structured'
+    assert [row.item.name for row in outcome.results] == ['Test Bow']
