@@ -59,6 +59,16 @@ def test_stat_search_ranks_highest_first_and_filters_type(tmp_path: Path) -> Non
     assert outcome.results[0].matched_stats[0].amount == 40
 
 
+def test_stat_search_groups_duplicate_stat_rows_into_one_item_card(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    try:
+        outcome = service.search('aggro xtal wp')
+    finally:
+        service.close()
+    assert [row.item.name for row in outcome.results] == ['Aggro Weapon Crystal']
+    assert [match.amount for match in outcome.results[0].matched_stats] == [15, 5]
+
+
 def test_numeric_expression_filters_results(tmp_path: Path) -> None:
     service = make_service(tmp_path)
     try:
