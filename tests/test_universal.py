@@ -3,7 +3,10 @@ from pathlib import Path
 from tests.item_db_factory import create_item_database
 from tests.skill_db_factory import create_skill_database
 from toram_search.autocomplete import build_autocomplete_index, suggestions_for_mode
-from toram_search.router import search_database
+from toram_search.interpretation import QueryChip, QueryInterpretation, RouteQuality
+from toram_search.items.models import ItemSearchOutcome
+from toram_search.router import search_database, select_winning_interpretation
+from toram_search.skills.models import SkillSearchOutcome
 
 
 def databases(tmp_path:Path)->tuple[Path,Path]:
@@ -90,3 +93,81 @@ def test_skills_autocomplete_does_not_need_item_database(tmp_path:Path)->None:
 
 def test_suggestions_for_mode_filters_prebuilt_universal_index(tmp_path:Path)->None:
     items,skills=databases(tmp_path);universal=build_autocomplete_index('Universal',items_path=items,skills_path=skills);assert all(r.kind in {'Item','Stat','Item Type'} for r in suggestions_for_mode(universal,'Items'));assert all(r.kind in {'Skill','Skill Tree','Ailment'} for r in suggestions_for_mode(universal,'Skills'))
+
+
+def _interp(domain: str, label: str) -> QueryInterpretation:
+    kind = 'stat' if domain == 'Items' else 'ailment'
+    return QueryInterpretation(
+        domain=domain,
+        canonical_query=label.casefold(),
+        chips=(QueryChip('one', kind, label, label.casefold(), ''),),
+    )
+
+
+def test_exact_winner_with_no_chips_does_not_fall_back_to_other_domain() -> None:
+    item = ItemSearchOutcome(
+        'results', 'shared',
+        route_quality=RouteQuality('structured', True, 3),
+        interpretation=_interp('Items', 'Critical Rate'),
+    )
+    skill = SkillSearchOutcome(
+        'results', 'shared',
+        route_quality=RouteQuality('exact', True, 1),
+    )
+    assert select_winning_interpretation(item, skill) is None
+
+
+def test_more_specific_structured_route_wins_same_family_tie() -> None:
+    item_interp = _interp('Items', 'Critical Rate')
+    skill_interp = _interp('Skills', 'Stun')
+    item = ItemSearchOutcome(
+        'results', 'shared',
+        route_quality=RouteQuality('structured', True, 1),
+        interpretation=item_interp,
+    )
+    skill = SkillSearchOutcome(
+        'results', 'shared',
+        route_quality=RouteQuality('structured', True, 2),
+        interpretation=skill_interp,
+    )
+    assert select_winning_interpretation(item, skill) == skill_interp
+
+
+def test_equal_quality_uses_stable_items_first_tie_break() -> None:
+    item_interp = _interp('Items', 'Critical Rate')
+    skill_interp = _interp('Skills', 'Stun')
+    item = ItemSearchOutcome(
+        'results', 'shared',
+        route_quality=RouteQuality('structured', True, 1),
+        interpretation=item_interp,
+    )
+    skill = SkillSearchOutcome(
+        'results', 'shared',
+        route_quality=RouteQuality('structured', True, 1),
+        interpretation=skill_interp,
+    )
+    assert select_winning_interpretation(item, skill) == item_interp
+
+
+def test_items_mode_exposes_item_interpretation(tmp_path: Path) -> None:
+    items = tmp_path / 'items.sqlite'
+    create_item_database(items)
+    outcome = search_database(
+        'Items', 'highest cr bow',
+        items_path=items,
+        skills_path=tmp_path / 'missing-skills.sqlite',
+    )
+    assert outcome.interpretation is not None
+    assert outcome.interpretation.domain == 'Items'
+
+
+def test_skills_mode_exposes_skill_interpretation(tmp_path: Path) -> None:
+    skills = tmp_path / 'skills.sqlite'
+    create_skill_database(skills)
+    outcome = search_database(
+        'Skills', 'skills that inflict stun',
+        items_path=tmp_path / 'missing-items.sqlite',
+        skills_path=skills,
+    )
+    assert outcome.interpretation is not None
+    assert outcome.interpretation.domain == 'Skills'
