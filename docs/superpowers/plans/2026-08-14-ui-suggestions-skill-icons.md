@@ -101,9 +101,7 @@ def test_catalog_resolves_tree_local_icon(tmp_path: Path) -> None:
     folder.mkdir(parents=True)
     icon = folder / "Guardian.png"
     icon.write_bytes(b"png")
-
     catalog = SkillIconCatalog(root)
-
     assert catalog.resolve("Shield Skills", "Guardian") == icon.resolve()
 
 
@@ -113,9 +111,7 @@ def test_catalog_applies_existing_tree_folder_aliases(tmp_path: Path) -> None:
     folder.mkdir(parents=True)
     icon = folder / "Magic Finale.png"
     icon.write_bytes(b"png")
-
     catalog = SkillIconCatalog(root)
-
     assert catalog.resolve("Magic Warrior Skills", "Magic Finale") == icon.resolve()
 
 
@@ -125,9 +121,7 @@ def test_catalog_uses_unique_global_fallback(tmp_path: Path) -> None:
     folder.mkdir(parents=True)
     icon = folder / "Guardian.png"
     icon.write_bytes(b"png")
-
     catalog = SkillIconCatalog(root)
-
     assert catalog.resolve("Unknown Skills", "Guardian") == icon.resolve()
 
 
@@ -137,16 +131,13 @@ def test_catalog_refuses_ambiguous_global_fallback(tmp_path: Path) -> None:
         folder = root / folder_name
         folder.mkdir(parents=True)
         (folder / "Duplicate.png").write_bytes(b"png")
-
     catalog = SkillIconCatalog(root)
-
     assert catalog.resolve("Missing Skills", "Duplicate") is None
 
 
 def test_real_guardian_icon_is_checked_in() -> None:
     catalog = SkillIconCatalog(Path("coryn_skill_icons"))
     icon = catalog.resolve("Shield Skills", "Guardian")
-
     assert icon is not None
     assert icon.name == "Guardian.png"
     assert icon.is_file()
@@ -170,14 +161,9 @@ from __future__ import annotations
 from pathlib import Path
 import unicodedata
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SKILL_ICON_ROOT = PROJECT_ROOT / "coryn_skill_icons"
-
-TREE_FOLDER_ALIASES = {
-    "magicwarrior": "magicblade",
-    "blacksmith": "smith",
-}
+TREE_FOLDER_ALIASES = {"magicwarrior": "magicblade", "blacksmith": "smith"}
 
 
 def normalize_icon_key(value: str) -> str:
@@ -201,10 +187,8 @@ class SkillIconCatalog:
     def _ensure_index(self) -> None:
         if self._folder_index is not None and self._global_index is not None:
             return
-
         folder_lists: dict[str, dict[str, list[Path]]] = {}
         global_lists: dict[str, list[Path]] = {}
-
         if self.root.is_dir():
             for folder in sorted(self.root.iterdir(), key=lambda path: path.name.casefold()):
                 if not folder.is_dir():
@@ -219,31 +203,25 @@ class SkillIconCatalog:
                         continue
                     local.setdefault(skill_key, []).append(icon)
                     global_lists.setdefault(skill_key, []).append(icon)
-
         self._folder_index = {
             folder_key: {skill_key: tuple(paths) for skill_key, paths in skill_map.items()}
             for folder_key, skill_map in folder_lists.items()
         }
-        self._global_index = {
-            skill_key: tuple(paths) for skill_key, paths in global_lists.items()
-        }
+        self._global_index = {skill_key: tuple(paths) for skill_key, paths in global_lists.items()}
 
     def resolve(self, tree_name: str, skill_name: str) -> Path | None:
         self._ensure_index()
         assert self._folder_index is not None
         assert self._global_index is not None
-
         skill_key = normalize_icon_key(skill_name)
         if not skill_key:
             return None
-
         folder_key = _tree_folder_key(tree_name)
         local_matches = self._folder_index.get(folder_key, {}).get(skill_key, ())
         if len(local_matches) == 1:
             return local_matches[0]
         if len(local_matches) > 1:
             return None
-
         global_matches = self._global_index.get(skill_key, ())
         if len(global_matches) == 1:
             return global_matches[0]
@@ -279,8 +257,8 @@ git commit -m "feat: add individual skill icon catalog"
 - Modify: `tests/test_app_shell.py`
 
 **Interfaces:**
-- Consumes: existing `SearchSubmission(query: str, nonce: int)` from `ui.search.render_search_box`; existing `suggested_queries` tuples.
-- Produces: `_render_message(..., key_prefix: str) -> str | None`; `render_item_results(...) -> str | None`; `render_skill_results(...) -> str | None`.
+- Consumes: `SearchSubmission(query: str, nonce: int)` from `ui.search.render_search_box`; `ItemSearchOutcome.suggested_queries`; `SkillSearchOutcome.suggested_queries`.
+- Produces: `_render_message(kind: str, message: str | None, suggestions: tuple[str, ...], *, key_prefix: str) -> str | None`; `render_item_results(outcome: ItemSearchOutcome, *, database_path: Path, limit: int) -> str | None`; `render_skill_results(outcome: SkillSearchOutcome, *, limit: int) -> str | None`.
 - Invariant: only a new `SearchSubmission.nonce` may assign `query_to_run`.
 
 - [ ] **Step 1: Add failing UI-contract tests**
@@ -306,14 +284,13 @@ def test_result_corrections_are_clickable_fill_values() -> None:
     assert "-> str | None" in source
 ```
 
-Append to `tests/test_app_shell.py` using the file's existing `AppTest.from_file(APP_PATH)` pattern:
+Append to `tests/test_app_shell.py`:
 
 ```python
 def test_example_button_fills_query_without_searching() -> None:
     app = AppTest.from_file(APP_PATH).run(timeout=10)
     target = next(button for button in app.button if button.label == "Guardian")
     target.click().run(timeout=10)
-
     assert app.session_state["query"] == "Guardian"
     assert app.session_state["last_outcome"] is None
 ```
@@ -326,11 +303,20 @@ python -m pytest tests/test_ui_contract.py tests/test_app_shell.py -q
 
 Expected: FAIL because examples currently execute searches below the component and result suggestions are passive text.
 
-- [ ] **Step 3: Return correction clicks from `ui/results.py` instead of rendering passive text**
+- [ ] **Step 3: Return correction clicks from `ui/results.py`**
 
-Implement:
+Replace `ui/results.py` with:
 
 ```python
+from __future__ import annotations
+from pathlib import Path
+import streamlit as st
+from toram_search.items.models import ItemSearchOutcome
+from toram_search.skills.models import SkillSearchOutcome
+from ui.item_cards import render_item_cards
+from ui.skill_cards import render_skill_cards
+
+
 def _render_message(
     kind: str,
     message: str | None,
@@ -345,10 +331,8 @@ def _render_message(
             st.info(message)
         else:
             st.write(message)
-
     if not suggestions:
         return None
-
     st.caption("Try:")
     columns = st.columns(min(len(suggestions), 4))
     for index, query in enumerate(suggestions):
@@ -360,11 +344,8 @@ def _render_message(
             ):
                 return query.strip() or None
     return None
-```
 
-Change the two result functions to return that value after rendering cards. Use their current concrete parameter lists:
 
-```python
 def render_item_results(
     outcome: ItemSearchOutcome,
     *,
@@ -400,11 +381,9 @@ def render_skill_results(
     return fill_query
 ```
 
-Do not call `search_database` from `ui/results.py`.
+- [ ] **Step 4: Move examples above the search component and remove their auto-search path**
 
-- [ ] **Step 4: Move examples above the component and make them fill-only**
-
-In `main.py`, render the existing mode-specific example tuples before `render_search_box`:
+In `main.py`, place this block before `render_search_box`:
 
 ```python
 examples = {
@@ -412,7 +391,6 @@ examples = {
     "Items": ("cr bow", "hp >= 5000 armor", "-aggro xtal", "highest cr"),
     "Skills": ("Guardian", "Shield Skills", "skills that inflict stun", "lowest mp shield skills"),
 }[mode]
-
 st.caption("Suggested searches")
 example_columns = st.columns(len(examples))
 example_query = None
@@ -425,14 +403,13 @@ for column, example in zip(example_columns, examples):
             disabled=not can_search,
         ):
             example_query = example
-
 if example_query:
     st.session_state.query = example_query
 ```
 
-Then call the existing custom component with `value=st.session_state.query`.
+Then render the existing component with `value=st.session_state.query`.
 
-Keep query execution strictly nonce-backed:
+Use only the nonce-backed submission branch:
 
 ```python
 query_to_run = None
@@ -441,38 +418,52 @@ if submission is not None and submission.nonce != st.session_state.last_submissi
     query_to_run = submission.query
 ```
 
-Delete the current branch that assigns `example_query` to `query_to_run`.
+Delete the old `elif example_query is not None: query_to_run = example_query` branch.
 
-- [ ] **Step 5: Feed correction clicks back into the search field without executing**
+- [ ] **Step 5: Feed correction clicks back into the component value without executing**
 
-In `main.py`, capture fill values while rendering stored outcomes:
+Replace the stored-outcome rendering block with this structure, retaining the current result headers and independent limits:
 
 ```python
-fill_query = None
+outcome: UniversalSearchOutcome | None = st.session_state.last_outcome
+if outcome is not None:
+    st.divider()
+    st.caption(f"Results for “{outcome.query}”")
+    fill_query = None
 
-if outcome.items is not None:
-    item_fill = render_item_results(
-        outcome.items,
-        database_path=ITEM_DATABASE,
-        limit=st.session_state.item_limit,
-    )
-    fill_query = fill_query or item_fill
-    # preserve the existing Show more items block
+    if outcome.items is not None:
+        item_fill = render_item_results(
+            outcome.items,
+            database_path=ITEM_DATABASE,
+            limit=st.session_state.item_limit,
+        )
+        fill_query = fill_query or item_fill
+        if (
+            len(outcome.items.results) > st.session_state.item_limit
+            and st.button("Show more items", key="show_more_items")
+        ):
+            st.session_state.item_limit += 20
+            st.rerun()
 
-if outcome.skills is not None:
-    skill_fill = render_skill_results(
-        outcome.skills,
-        limit=st.session_state.skill_limit,
-    )
-    fill_query = fill_query or skill_fill
-    # preserve the existing Show more skills block
+    if outcome.skills is not None:
+        skill_fill = render_skill_results(
+            outcome.skills,
+            limit=st.session_state.skill_limit,
+        )
+        fill_query = fill_query or skill_fill
+        if (
+            len(outcome.skills.results) > st.session_state.skill_limit
+            and st.button("Show more skills", key="show_more_skills")
+        ):
+            st.session_state.skill_limit += 20
+            st.rerun()
 
-if fill_query:
-    st.session_state.query = fill_query
-    st.rerun()
+    if fill_query:
+        st.session_state.query = fill_query
+        st.rerun()
 ```
 
-Do not modify `last_submission_nonce`, `last_outcome`, or call `search_database` in the fill-only branch. The rerun is required because correction buttons render below the search component.
+Do not modify `last_submission_nonce` or `last_outcome` in the fill-only branch.
 
 - [ ] **Step 6: Run focused fill-only regressions**
 
@@ -480,7 +471,7 @@ Do not modify `last_submission_nonce`, `last_outcome`, or call `search_database`
 python -m pytest tests/test_ui_contract.py tests/test_app_shell.py tests/test_search_component.py -q
 ```
 
-Expected: PASS, including the existing guarantees that autocomplete click/Tab acceptance does not submit.
+Expected: PASS.
 
 - [ ] **Step 7: Commit the interaction change**
 
@@ -500,7 +491,7 @@ git commit -m "feat: make search suggestions fill only"
 
 **Interfaces:**
 - Consumes: `DEFAULT_SKILL_ICON_CATALOG.resolve(tree_name: str, skill_name: str) -> Path | None`.
-- Produces: a small skill-card thumbnail and the same icon at a larger size in the detail dialog.
+- Produces: a 64px skill-card thumbnail and a 96px skill-detail icon.
 
 - [ ] **Step 1: Add failing shared-resolver UI tests**
 
@@ -526,62 +517,121 @@ python -m pytest tests/test_ui_contract.py tests/test_skill_icons.py -q
 
 Expected: FAIL because the current skill UI does not render icons.
 
-- [ ] **Step 3: Render icons in skill cards**
-
-Import in `ui/skill_cards.py`:
+- [ ] **Step 3: Replace `ui/skill_cards.py` with icon-aware rendering**
 
 ```python
+from __future__ import annotations
+import streamlit as st
 from toram_search.skill_icons import DEFAULT_SKILL_ICON_CATALOG
+from toram_search.skills.models import SkillCardResult
+from ui.skill_dialog import show_skill_dialog
+
+
+def render_skill_cards(results: tuple[SkillCardResult, ...], *, limit: int) -> None:
+    visible = results[:limit]
+    for index in range(0, len(visible), 2):
+        columns = st.columns(2)
+        for offset, card in enumerate(visible[index : index + 2]):
+            skill = card.skill
+            with columns[offset]:
+                with st.container(border=True):
+                    icon_path = DEFAULT_SKILL_ICON_CATALOG.resolve(card.tree_name, skill.name)
+                    if icon_path is not None:
+                        icon_column, content_column = st.columns([1, 4], vertical_alignment="top")
+                        with icon_column:
+                            st.image(str(icon_path), width=64)
+                    else:
+                        content_column = st.container()
+                    with content_column:
+                        st.markdown(f"**{skill.name}**")
+                        meta = [card.tree_name]
+                        if skill.tier is not None:
+                            meta.append(f"Tier {skill.tier}")
+                        st.caption(" · ".join(meta))
+                        facts = []
+                        if skill.mp_cost_text:
+                            facts.append(f"MP {skill.mp_cost_text}")
+                        if skill.required_level is not None:
+                            facts.append(f"Lv. {skill.required_level}")
+                        if skill.skill_type:
+                            facts.append(skill.skill_type)
+                        if facts:
+                            st.write(" · ".join(facts))
+                        if skill.ailments:
+                            st.write("Ailment: " + ", ".join(skill.ailments))
+                        if st.button(
+                            "View details",
+                            key=f"skill_detail_{skill.id}",
+                            use_container_width=True,
+                        ):
+                            show_skill_dialog(card)
 ```
 
-Inside each existing bordered card, resolve once:
+- [ ] **Step 4: Replace `ui/skill_dialog.py` with the same shared icon resolver plus existing detail content**
 
 ```python
-icon_path = DEFAULT_SKILL_ICON_CATALOG.resolve(card.tree_name, skill.name)
-```
-
-Use the existing metadata/body logic inside a content container. When an icon exists:
-
-```python
-if icon_path is not None:
-    icon_column, content_column = st.columns([1, 4], vertical_alignment="top")
-    with icon_column:
-        st.image(str(icon_path), width=64)
-else:
-    content_column = st.container()
-
-with content_column:
-    st.markdown(f"**{skill.name}**")
-    # retain the existing tree/tier, MP/level/type, ailment, and View details rendering
-```
-
-Keep the outer two-card-per-row layout unchanged. If no icon resolves, render the same text-only card as today.
-
-- [ ] **Step 4: Render the same icon in the skill detail dialog**
-
-Import in `ui/skill_dialog.py`:
-
-```python
+from __future__ import annotations
+import streamlit as st
 from toram_search.skill_icons import DEFAULT_SKILL_ICON_CATALOG
-```
+from toram_search.skills.models import SkillCardResult
 
-At the top of `show_skill_dialog`:
 
-```python
-skill = card.skill
-icon_path = DEFAULT_SKILL_ICON_CATALOG.resolve(card.tree_name, skill.name)
-
-if icon_path is not None:
-    icon_column, title_column = st.columns([1, 5], vertical_alignment="center")
-    with icon_column:
-        st.image(str(icon_path), width=96)
-    with title_column:
+@st.dialog("Skill details")
+def show_skill_dialog(card: SkillCardResult) -> None:
+    skill = card.skill
+    icon_path = DEFAULT_SKILL_ICON_CATALOG.resolve(card.tree_name, skill.name)
+    if icon_path is not None:
+        icon_column, title_column = st.columns([1, 5], vertical_alignment="center")
+        with icon_column:
+            st.image(str(icon_path), width=96)
+        with title_column:
+            st.subheader(skill.name)
+    else:
         st.subheader(skill.name)
-else:
-    st.subheader(skill.name)
-```
 
-Keep all existing metadata, metrics, restrictions, descriptions, game description, and sections unchanged below the header.
+    header = [card.tree_name]
+    if skill.tier is not None:
+        header.append(f"Tier {skill.tier}")
+    if skill.skill_type:
+        header.append(skill.skill_type)
+    st.caption(" · ".join(header))
+
+    left, right = st.columns(2)
+    with left:
+        st.metric("MP", skill.mp_cost_text or "—")
+    with right:
+        st.metric(
+            "Required Lv.",
+            skill.required_level if skill.required_level is not None else "—",
+        )
+
+    for label, value in (
+        ("Damage Type", skill.damage_type),
+        ("Element", skill.element),
+        ("Cast Range", skill.cast_range_text),
+        ("Hit Range", skill.hit_range_text),
+        ("Cast Time", skill.cast_time_text),
+        ("Hit Count", skill.hit_count_text),
+    ):
+        if value:
+            st.write(f"**{label}:** {value}")
+    if skill.ailments:
+        st.write("**Ailments:** " + ", ".join(skill.ailments))
+    if skill.weapon_requirements:
+        st.write("**Weapon requirements:** " + ", ".join(skill.weapon_requirements))
+    if skill.weapon_restrictions:
+        st.write("**Weapon restrictions:** " + ", ".join(skill.weapon_restrictions))
+    if skill.description:
+        st.markdown("#### Description")
+        st.write(skill.description)
+    if skill.game_description:
+        st.markdown("#### Game description")
+        st.write(skill.game_description)
+    for section in skill.sections:
+        if section.body:
+            st.markdown(f"#### {section.label}")
+            st.write(section.body)
+```
 
 - [ ] **Step 5: Run icon UI tests**
 
@@ -665,4 +715,4 @@ Confirm the repository `Tests` workflow completes successfully on Python 3.12 wi
 
 - [ ] **Step 7: Commit only genuine verification fixes if required**
 
-If verification exposed a real test-harness issue, fix it, rerun the affected test plus the full suite, and commit the exact changed files. If no fix was required, do not create an empty commit.
+If verification exposes a real test-harness issue, fix it, rerun the affected test plus the full suite, and commit the exact changed files. If no fix is required, do not create an empty commit.
