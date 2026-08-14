@@ -2,8 +2,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from rapidfuzz import fuzz
+
+from toram_search.interpretation import RouteQuality
 from .aliases import STAT_ALIASES, normalize_stat_text
 from .filters import extract_item_filter
+from .interpretation import build_expression_item_interpretation, build_simple_item_interpretation
 from .models import ItemCardResult, ItemSearchOutcome
 from .repository import ItemRepository
 from .stat_query import StatQuerySyntaxError, parse_stat_expression
@@ -46,27 +49,49 @@ class ItemSearchService:
         return tuple(ItemCardResult(grouped[item_id][0],tuple(grouped[item_id][1])) for item_id in order)
     def search(self,query:str)->ItemSearchOutcome:
         raw=' '.join(str(query).split())
-        if not raw:return ItemSearchOutcome('not_found',raw,message='Enter an item name or stat query.',routing_confidence='none')
+
+        def finish(
+            kind,
+            results=(),
+            message=None,
+            suggested_queries=(),
+            routing_confidence='none',
+            family='none',
+            specificity=0,
+            interpretation=None,
+        ):
+            return ItemSearchOutcome(
+                kind,
+                raw,
+                results,
+                message,
+                suggested_queries,
+                routing_confidence,
+                interpretation,
+                RouteQuality(family, bool(results), specificity),
+            )
+
+        if not raw:return finish('not_found',message='Enter an item name or stat query.')
         q=raw.casefold().strip(' ?!.')
         if q in {'help','how to search','search help','how do i search','how to use'}:
-            return ItemSearchOutcome('help',raw,message=_HELP,routing_confidence='strong')
+            return finish('help',message=_HELP,routing_confidence='strong',family='structured')
         if _SUBJECTIVE.search(raw):
-            return ItemSearchOutcome('refuse',raw,message='This search only compares objective database fields; subjective build/tank/DPS recommendations are not supported.',routing_confidence='strong')
+            return finish('refuse',message='This search only compares objective database fields; subjective build/tank/DPS recommendations are not supported.',routing_confidence='strong',family='structured')
         if q in {'list stats','what stats are in the database','what stats can i search'}:
-            stats=self.repository.list_stat_names(); return ItemSearchOutcome('meta',raw,message='Stats in the database: '+', '.join(stats),routing_confidence='strong')
+            stats=self.repository.list_stat_names(); return finish('meta',message='Stats in the database: '+', '.join(stats),routing_confidence='strong',family='structured')
         if q in {'list item types','what item types are in the database'}:
-            return ItemSearchOutcome('meta',raw,message='Item types: '+', '.join(sorted(self.repository.list_item_types())),routing_confidence='strong')
+            return finish('meta',message='Item types: '+', '.join(sorted(self.repository.list_item_types())),routing_confidence='strong',family='structured')
         if q in {'how many items are there','how many items are in the database','total item count'}:
-            return ItemSearchOutcome('meta',raw,message=f'{self.repository.count_items_total()} items are in the database.',routing_confidence='strong')
+            return finish('meta',message=f'{self.repository.count_items_total()} items are in the database.',routing_confidence='strong',family='structured')
         if q.startswith('upgrade '):
             target=raw[8:].strip(); exact=self.repository.exact_upgrade_name_matches(target)
             if exact:
-                item=exact[0]; return ItemSearchOutcome('results',raw,(ItemCardResult(item),),routing_confidence='strong')
+                item=exact[0]; return finish('results',(ItemCardResult(item),),routing_confidence='strong',family='exact',specificity=1)
             fuzzy=[r for r in self.repository.fuzzy_items(target) if 'crysta' in r[0].item_type.casefold()]
-            if fuzzy:return ItemSearchOutcome('results',raw,tuple(ItemCardResult(i,score=s,match_kind=k) for i,s,k in fuzzy),routing_confidence='strong')
-            return ItemSearchOutcome('not_found',raw,message='No matching crysta found.',routing_confidence='strong')
+            if fuzzy:return finish('results',tuple(ItemCardResult(i,score=s,match_kind=k) for i,s,k in fuzzy),routing_confidence='strong',family='structured',specificity=1)
+            return finish('not_found',message='No matching crysta found.',routing_confidence='strong',family='structured',specificity=1)
         exact=self.repository.exact_name_matches(raw)
-        if exact:return ItemSearchOutcome('results',raw,tuple(ItemCardResult(x,score=100,match_kind='exact') for x in exact),routing_confidence='strong')
+        if exact:return finish('results',tuple(ItemCardResult(x,score=100,match_kind='exact') for x in exact),routing_confidence='strong',family='exact',specificity=1)
 
         item_filter, remaining = extract_item_filter(raw,self.repository.list_item_types())
         remaining_norm=normalize_stat_text(remaining)
@@ -85,13 +110,21 @@ class ItemSearchService:
         if len(stat_hits)>=2 and not re.search(r"(>=|<=|==|>|<|=)|\b(and|or)\b",remaining_norm):
             filter_text=item_filter.consumed_text if item_filter else ''
             suggested=' and '.join(dict.fromkeys(stat_hits)) + (f' {filter_text}' if filter_text else '')
-            return ItemSearchOutcome('suggest',raw,message=f'I could not safely parse "{raw}".',suggested_queries=(suggested.strip(),),routing_confidence='strong')
+            specificity=max(1,len(tuple(dict.fromkeys(stat_hits))) + int(item_filter is not None))
+            return finish('suggest',message=f'I could not safely parse "{raw}".',suggested_queries=(suggested.strip(),),routing_confidence='strong',family='structured',specificity=specificity)
 
         looks_expression=bool(re.search(r"(>=|<=|==|>|<|=)|\b(and|or)\b",raw, re.I))
         stat, choices=self._resolve_stat(remaining_norm)
         recognized_structured_intent=bool(item_filter is not None or rank_direction is not None or looks_expression or stat is not None or choices or stat_hits)
         if choices:
-            return ItemSearchOutcome('clarify',raw,message='Choose a stat: '+', '.join(choices),suggested_queries=tuple(f'{c} {item_filter.consumed_text if item_filter else ""}'.strip() for c in choices),routing_confidence='strong')
+            return finish(
+                'clarify',
+                message='Choose a stat: '+', '.join(choices),
+                suggested_queries=tuple(f'{c} {item_filter.consumed_text if item_filter else ""}'.strip() for c in choices),
+                routing_confidence='strong',
+                family='structured',
+                specificity=1 + int(item_filter is not None),
+            )
         if stat and not looks_expression:
             rows=self.repository.search_stat(stat,item_filter.item_types if item_filter else None)
             if negative_stat:
@@ -100,17 +133,41 @@ class ItemSearchService:
             elif rank_direction == 'asc':
                 rows.sort(key=lambda row: (row[1].amount, row[0].name.casefold(), row[0].id))
             cards=self._group_stat_rows(rows)
-            return ItemSearchOutcome('results' if cards else 'not_found',raw,cards,None if cards else 'No matching items found.',routing_confidence='strong')
+            interpretation=build_simple_item_interpretation(stat,item_filter,rank_direction,negative_stat)
+            specificity=1 + int(item_filter is not None) + int(rank_direction is not None)
+            return finish(
+                'results' if cards else 'not_found',
+                cards,
+                None if cards else 'No matching items found.',
+                routing_confidence='strong',
+                family='structured',
+                specificity=specificity,
+                interpretation=interpretation,
+            )
         if looks_expression:
             try: expr=parse_stat_expression(raw,self.repository.list_item_types(),self.repository.list_stat_names())
-            except StatQuerySyntaxError as exc: return ItemSearchOutcome('suggest',raw,message=str(exc),routing_confidence='strong')
+            except StatQuerySyntaxError as exc:
+                return finish('suggest',message=str(exc),routing_confidence='strong',family='structured',specificity=1 + int(item_filter is not None))
             known={normalize_stat_text(x) for x in self.repository.list_stat_names()}
             unknown=[c.typed_stat for g in expr.groups for c in g.clauses if normalize_stat_text(c.typed_stat) not in known]
-            if unknown:return ItemSearchOutcome('suggest',raw,message='Unknown stat: '+unknown[0],routing_confidence='strong')
+            if unknown:
+                return finish('suggest',message='Unknown stat: '+unknown[0],routing_confidence='strong',family='structured',specificity=max(1,sum(len(g.clauses) for g in expr.groups) + int(expr.item_filter is not None)))
             rows=self.repository.search_expression(expr)
-            return ItemSearchOutcome('results' if rows else 'not_found',raw,tuple(ItemCardResult(i,m) for i,m,_ in rows),None if rows else 'No matching items found.',routing_confidence='strong')
+            cards=tuple(ItemCardResult(i,m) for i,m,_score in rows)
+            clause_count=sum(len(group.clauses) for group in expr.groups)
+            specificity=clause_count + int(expr.item_filter is not None)
+            return finish(
+                'results' if cards else 'not_found',
+                cards,
+                None if cards else 'No matching items found.',
+                routing_confidence='strong',
+                family='structured',
+                specificity=specificity,
+                interpretation=build_expression_item_interpretation(expr),
+            )
         if recognized_structured_intent:
-            return ItemSearchOutcome('suggest',raw,message=f'I could not safely parse "{raw}".',routing_confidence='strong')
+            specificity=max(1,int(item_filter is not None) + int(rank_direction is not None) + int(stat is not None) + len(stat_hits))
+            return finish('suggest',message=f'I could not safely parse "{raw}".',routing_confidence='strong',family='structured',specificity=specificity)
         ranked=self.repository.fuzzy_items(raw)
-        if ranked:return ItemSearchOutcome('results',raw,tuple(ItemCardResult(i,score=s,match_kind=k) for i,s,k in ranked),routing_confidence='weak')
-        return ItemSearchOutcome('not_found',raw,message='No matching item or stat found.',routing_confidence='none')
+        if ranked:return finish('results',tuple(ItemCardResult(i,score=s,match_kind=k) for i,s,k in ranked),routing_confidence='weak',family='weak')
+        return finish('not_found',message='No matching item or stat found.')
