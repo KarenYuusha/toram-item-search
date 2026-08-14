@@ -37,6 +37,7 @@ class ItemCardResult:
     match_kind: str | None = None
 
 ItemOutcomeKind = Literal["results","help","meta","clarify","suggest","refuse","not_found"]
+RoutingConfidence = Literal["strong","weak","none"]
 
 @dataclass(frozen=True)
 class ItemSearchOutcome:
@@ -45,6 +46,7 @@ class ItemSearchOutcome:
     results: tuple[ItemCardResult, ...] = ()
     message: str | None = None
     suggested_queries: tuple[str, ...] = ()
+    routing_confidence: RoutingConfidence = "none"
 
 @dataclass(frozen=True)
 class ParsedClause:
