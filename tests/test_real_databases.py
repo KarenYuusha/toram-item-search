@@ -57,5 +57,7 @@ def test_real_universal_aggro_xtal_wp_suppresses_unrelated_skills() -> None:
         'weapon crysta',
         'enhancer crysta (red)',
     }
+    item_ids = [row.item.id for row in outcome.items.results]
+    assert len(item_ids) == len(set(item_ids))
     assert outcome.skills is not None
     assert not outcome.skills.results
