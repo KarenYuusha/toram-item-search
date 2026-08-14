@@ -42,3 +42,18 @@ def test_skill_ui_uses_shared_icon_catalog()->None:
     assert 'DEFAULT_SKILL_ICON_CATALOG' in dialog
     assert 'st.image' in cards
     assert 'st.image' in dialog
+
+
+def test_query_interpretation_renders_after_search_box_before_results() -> None:
+    source = text('main.py')
+    assert 'render_query_interpretation' in source
+    assert source.index('submission=render_search_box') < source.index('render_query_interpretation')
+    assert source.index('render_query_interpretation') < source.index('st.divider()')
+
+
+def test_chip_removal_clears_outcome_instead_of_submitting() -> None:
+    source = text('main.py')
+    block = source[source.index('chip_fill='):source.index('st.divider()')]
+    assert 'st.session_state.last_outcome=None' in block
+    assert 'query_to_run=chip_fill' not in block
+    assert 'search_database(' not in block
