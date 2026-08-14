@@ -133,6 +133,19 @@ def test_highest_stat_prefix_sorts_descending(tmp_path: Path) -> None:
     assert [row.item.name for row in outcome.results[:2]] == ['Crit Ring', 'Test Bow']
 
 
+def test_item_routing_confidence_distinguishes_strong_weak_and_none(tmp_path: Path) -> None:
+    path = tmp_path / 'items.sqlite'
+    create_item_database(path)
+    service = ItemSearchService(path)
+    try:
+        assert service.search('Test Bow').routing_confidence == 'strong'
+        assert service.search('critical rate bow').routing_confidence == 'strong'
+        assert service.search('Test Bo').routing_confidence == 'weak'
+        assert service.search('totally unrelated words').routing_confidence == 'none'
+    finally:
+        service.close()
+
+
 def test_rank_items_prefers_prefix_match() -> None:
     from toram_search.items.models import ItemSummary
     from toram_search.items.ranking import rank_items
