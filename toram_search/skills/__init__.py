@@ -1,0 +1,1 @@
+"""Deterministic skill search domain."""
