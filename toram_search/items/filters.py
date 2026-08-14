@@ -7,6 +7,16 @@ class ItemTypeFilter:
     label: str
     item_types: tuple[str, ...]
     consumed_text: str
+    canonical_text: str
+
+_CANONICAL_SPECIAL = {
+    'Weapon Crysta': 'weapon xtal',
+    'Armor Crysta': 'armor xtal',
+    'Additional Crysta': 'additional xtal',
+    'Special Crysta': 'ring xtal',
+    'All Crysta': 'xtal',
+    'Main Weapons': 'weapon',
+}
 
 
 def _existing(types: tuple[str, ...], available: set[str]) -> tuple[str, ...]:
@@ -59,5 +69,6 @@ def extract_item_filter(text: str, available_item_types: set[str]) -> tuple[Item
         for start in range(len(tokens)-len(p)+1):
             if tokens[start:start+len(p)] == p:
                 remaining = tokens[:start] + tokens[start+len(p):]
-                return ItemTypeFilter(label, types, phrase), " ".join(remaining)
+                canonical = _CANONICAL_SPECIAL.get(label, normalize_stat_text(label))
+                return ItemTypeFilter(label, types, phrase, canonical), " ".join(remaining)
     return None, normalized
