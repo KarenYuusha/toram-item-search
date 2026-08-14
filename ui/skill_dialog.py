@@ -1,14 +1,29 @@
 from __future__ import annotations
 import streamlit as st
+from toram_search.skill_icons import DEFAULT_SKILL_ICON_CATALOG
 from toram_search.skills.models import SkillCardResult
+
 
 @st.dialog('Skill details')
 def show_skill_dialog(card: SkillCardResult) -> None:
-    skill=card.skill; st.subheader(skill.name)
-    header=[card.tree_name]
-    if skill.tier is not None: header.append(f'Tier {skill.tier}')
-    if skill.skill_type: header.append(skill.skill_type)
-    st.caption(' · '.join(header))
+    skill=card.skill
+    icon=DEFAULT_SKILL_ICON_CATALOG.resolve(card.tree_name,skill.name)
+    if icon is not None:
+        icon_column,text_column=st.columns([1,4])
+        with icon_column:
+            st.image(str(icon),width=96)
+        with text_column:
+            st.subheader(skill.name)
+            header=[card.tree_name]
+            if skill.tier is not None: header.append(f'Tier {skill.tier}')
+            if skill.skill_type: header.append(skill.skill_type)
+            st.caption(' · '.join(header))
+    else:
+        st.subheader(skill.name)
+        header=[card.tree_name]
+        if skill.tier is not None: header.append(f'Tier {skill.tier}')
+        if skill.skill_type: header.append(skill.skill_type)
+        st.caption(' · '.join(header))
     left,right=st.columns(2)
     with left: st.metric('MP',skill.mp_cost_text or '—')
     with right: st.metric('Required Lv.',skill.required_level if skill.required_level is not None else '—')
