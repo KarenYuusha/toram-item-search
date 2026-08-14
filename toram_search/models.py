@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+from toram_search.interpretation import QueryInterpretation
+
 if TYPE_CHECKING:
     from toram_search.items.models import ItemSearchOutcome
     from toram_search.skills.models import SkillSearchOutcome
@@ -32,3 +34,4 @@ class UniversalSearchOutcome:
     query: str
     items: ItemSearchOutcome | None = None
     skills: SkillSearchOutcome | None = None
+    interpretation: QueryInterpretation | None = None
