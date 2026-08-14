@@ -17,15 +17,27 @@ def _existing(types: tuple[str, ...], available: set[str]) -> tuple[str, ...]:
 def _candidates(available: set[str]) -> list[tuple[str, str, tuple[str, ...]]]:
     rows: list[tuple[str,str,tuple[str,...]]] = []
     special = {
+        "weapon xtal": ("Weapon Crysta", ("Weapon Crysta", "Enhancer Crysta (Red)")),
+        "wp xtal": ("Weapon Crysta", ("Weapon Crysta", "Enhancer Crysta (Red)")),
+        "xtal weapon": ("Weapon Crysta", ("Weapon Crysta", "Enhancer Crysta (Red)")),
+        "xtal wp": ("Weapon Crysta", ("Weapon Crysta", "Enhancer Crysta (Red)")),
+        "armor xtal": ("Armor Crysta", ("Armor Crysta", "Enhancer Crysta (Green)")),
+        "arm xtal": ("Armor Crysta", ("Armor Crysta", "Enhancer Crysta (Green)")),
+        "xtal armor": ("Armor Crysta", ("Armor Crysta", "Enhancer Crysta (Green)")),
+        "xtal arm": ("Armor Crysta", ("Armor Crysta", "Enhancer Crysta (Green)")),
+        "additional xtal": ("Additional Crysta", ("Additional Crysta", "Enhancer Crysta (Yellow)")),
+        "add xtal": ("Additional Crysta", ("Additional Crysta", "Enhancer Crysta (Yellow)")),
+        "xtal additional": ("Additional Crysta", ("Additional Crysta", "Enhancer Crysta (Yellow)")),
+        "xtal add": ("Additional Crysta", ("Additional Crysta", "Enhancer Crysta (Yellow)")),
+        "ring xtal": ("Special Crysta", ("Special Crysta", "Enhancer Crysta (Purple)")),
+        "special xtal": ("Special Crysta", ("Special Crysta", "Enhancer Crysta (Purple)")),
+        "xtal ring": ("Special Crysta", ("Special Crysta", "Enhancer Crysta (Purple)")),
+        "xtal special": ("Special Crysta", ("Special Crysta", "Enhancer Crysta (Purple)")),
         "xtal": ("All Crysta", ALL_CRYSTA_TYPES),
         "crysta": ("All Crysta", ALL_CRYSTA_TYPES),
         "crystal": ("All Crysta", ALL_CRYSTA_TYPES),
         "weapon": ("Main Weapons", MAIN_WEAPON_TYPES),
         "wp": ("Main Weapons", MAIN_WEAPON_TYPES),
-        "weapon xtal": ("Weapon Crysta", ("Weapon Crysta", "Enhancer Crysta (Red)")),
-        "ring xtal": ("Special Crysta", ("Special Crysta", "Enhancer Crysta (Purple)")),
-        "armor xtal": ("Armor Crysta", ("Armor Crysta", "Enhancer Crysta (Green)")),
-        "additional xtal": ("Additional Crysta", ("Additional Crysta", "Enhancer Crysta (Yellow)")),
     }
     for phrase, (label, types) in special.items():
         actual = _existing(tuple(types), available)

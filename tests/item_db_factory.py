@@ -32,6 +32,8 @@ def create_item_database(path: Path) -> None:
         (4, 1, 'Old Crystal', 'Normal Crysta', 100, None, None, None, None, None, 'https://example.com/old', ''),
         (5, 1, 'New Crystal', 'Normal Crysta', 100, None, None, None, None, None, 'https://example.com/new', ''),
         (6, 1, 'Low Aggro Ring', 'Special', 100, None, None, None, None, None, 'https://example.com/aggro', ''),
+        (7, 1, 'Aggro Weapon Crystal', 'Weapon Crysta', 100, None, None, None, None, None, 'https://example.com/weapon-crysta', ''),
+        (8, 1, 'Unrelated Dagger', 'Dagger', 100, None, None, None, None, None, 'https://example.com/dagger', ''),
     ]
     db.executemany('INSERT INTO items VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', items)
     stats = [
@@ -42,6 +44,8 @@ def create_item_database(path: Path) -> None:
         (4,3,0,'MaxHP',6000,'[]',None,None,0),
         (5,5,0,'Upgrade for',4,'[]',None,None,0),
         (6,6,0,'Aggro %',-10,'[]',None,None,0),
+        (8,7,0,'Aggro %',15,'[]',None,None,0),
+        (9,8,0,'Critical Rate',1,'[]',None,None,0),
     ]
     db.executemany('INSERT INTO item_stats VALUES (?,?,?,?,?,?,?,?,?)', stats)
     db.execute("INSERT INTO item_sources VALUES (1,1,0,10,'Test Monster',100,'Test Map',NULL,'https://example.com/monster',NULL,'[]')")
