@@ -6,6 +6,7 @@ from toram_search.autocomplete import build_autocomplete_index
 from toram_search.database import ITEM_DATABASE, SKILL_DATABASE, validate_databases
 from toram_search.models import DatabaseMode, UniversalSearchOutcome
 from toram_search.router import search_database
+from ui import interpretation as query_interpretation_ui
 from ui.results import render_item_results, render_skill_results
 from ui.search import render_search_box
 from ui.sidebar import render_sidebar
@@ -45,6 +46,9 @@ if query_to_run is not None and can_search:
     with st.spinner('Searching database...'):
         st.session_state.last_outcome=search_database(mode,query_to_run,items_path=ITEM_DATABASE,skills_path=SKILL_DATABASE)
 outcome:UniversalSearchOutcome|None=st.session_state.last_outcome
+chip_fill=query_interpretation_ui.render_query_interpretation(outcome.interpretation if outcome is not None else None)
+if chip_fill is not None:
+    st.session_state.query=chip_fill; st.session_state.last_outcome=None; st.session_state.item_limit=20; st.session_state.skill_limit=20; st.rerun()
 if outcome is not None:
     st.divider(); st.caption(f'Results for “{outcome.query}”')
     if outcome.items is not None:
