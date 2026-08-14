@@ -5,6 +5,7 @@ import pytest
 
 from tests.item_db_factory import create_item_database
 from toram_search.items.aliases import expand_stat_aliases
+from toram_search.items.filters import extract_item_filter
 from toram_search.items.repository import ItemRepository
 from toram_search.items.service import ItemSearchService
 from toram_search.items.stat_query import parse_stat_expression
@@ -121,7 +122,7 @@ def test_lowest_stat_prefix_sorts_ascending(tmp_path: Path) -> None:
         outcome = service.search('lowest cr')
     finally:
         service.close()
-    assert [row.item.name for row in outcome.results[:2]] == ['Test Bow', 'Crit Ring']
+    assert [row.item.name for row in outcome.results[:2]] == ['Unrelated Dagger', 'Test Bow']
 
 
 def test_highest_stat_prefix_sorts_descending(tmp_path: Path) -> None:
@@ -130,7 +131,7 @@ def test_highest_stat_prefix_sorts_descending(tmp_path: Path) -> None:
         outcome = service.search('highest cr')
     finally:
         service.close()
-    assert [row.item.name for row in outcome.results[:2]] == ['Crit Ring', 'Test Bow']
+    assert [row.item.name for row in outcome.results[:3]] == ['Crit Ring', 'Test Bow', 'Unrelated Dagger']
 
 
 def test_item_routing_confidence_distinguishes_strong_weak_and_none(tmp_path: Path) -> None:
@@ -142,6 +143,48 @@ def test_item_routing_confidence_distinguishes_strong_weak_and_none(tmp_path: Pa
         assert service.search('critical rate bow').routing_confidence == 'strong'
         assert service.search('Test Bo').routing_confidence == 'weak'
         assert service.search('totally unrelated words').routing_confidence == 'none'
+    finally:
+        service.close()
+
+
+def test_specific_crysta_slot_aliases_are_order_insensitive(tmp_path: Path) -> None:
+    path = tmp_path / 'items.sqlite'
+    create_item_database(path)
+    service = ItemSearchService(path)
+    try:
+        available = service.repository.list_item_types()
+        for query in ('aggro xtal wp', 'aggro wp xtal', 'aggro weapon xtal'):
+            item_filter, remaining = extract_item_filter(query, available)
+            assert item_filter is not None
+            assert item_filter.label == 'Weapon Crysta'
+            assert set(item_filter.item_types) == {'Weapon Crysta'}
+            assert remaining == 'aggro'
+    finally:
+        service.close()
+
+
+def test_aggro_xtal_wp_returns_weapon_crysta_not_fuzzy_item(tmp_path: Path) -> None:
+    path = tmp_path / 'items.sqlite'
+    create_item_database(path)
+    service = ItemSearchService(path)
+    try:
+        outcome = service.search('aggro xtal wp')
+        assert outcome.routing_confidence == 'strong'
+        assert [row.item.name for row in outcome.results] == ['Aggro Weapon Crystal']
+        assert all(row.item.item_type == 'Weapon Crysta' for row in outcome.results)
+    finally:
+        service.close()
+
+
+def test_structured_item_intent_with_unknown_leftover_does_not_fuzzy_match(tmp_path: Path) -> None:
+    path = tmp_path / 'items.sqlite'
+    create_item_database(path)
+    service = ItemSearchService(path)
+    try:
+        outcome = service.search('aggro xtal nonsense')
+        assert outcome.routing_confidence == 'strong'
+        assert outcome.kind in {'suggest', 'not_found'}
+        assert not outcome.results
     finally:
         service.close()
 
