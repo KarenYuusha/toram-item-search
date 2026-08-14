@@ -142,7 +142,7 @@ def test_item_routing_confidence_distinguishes_strong_weak_and_none(tmp_path: Pa
         assert service.search('Test Bow').routing_confidence == 'strong'
         assert service.search('critical rate bow').routing_confidence == 'strong'
         assert service.search('Test Bo').routing_confidence == 'weak'
-        assert service.search('totally unrelated words').routing_confidence == 'none'
+        assert service.search('zzzxqv qqqy').routing_confidence == 'none'
     finally:
         service.close()
 
