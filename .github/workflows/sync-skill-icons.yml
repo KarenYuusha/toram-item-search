@@ -1,0 +1,48 @@
+name: Sync skill icons
+
+on:
+  push:
+    branches:
+      - feat/ui-suggestions-skill-icons
+    paths:
+      - .github/workflows/sync-skill-icons.yml
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out target repository
+        uses: actions/checkout@v4
+        with:
+          ref: feat/ui-suggestions-skill-icons
+          fetch-depth: 0
+
+      - name: Check out source repository
+        uses: actions/checkout@v4
+        with:
+          repository: KarenYuusha/filter_search
+          ref: main
+          path: source-filter-search
+
+      - name: Copy canonical skill icons
+        run: |
+          rm -rf coryn_skill_icons
+          cp -R source-filter-search/coryn_skill_icons ./coryn_skill_icons
+          test -f 'coryn_skill_icons/Shield/Guardian.png'
+          test -f 'coryn_skill_icons/Shield/Shield Bash.png'
+          rm -rf source-filter-search
+
+      - name: Commit synced icons
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add coryn_skill_icons
+          if git diff --cached --quiet; then
+            echo 'No icon changes to commit.'
+          else
+            git commit -m 'chore: sync canonical skill icons'
+            git push origin HEAD:feat/ui-suggestions-skill-icons
+          fi
