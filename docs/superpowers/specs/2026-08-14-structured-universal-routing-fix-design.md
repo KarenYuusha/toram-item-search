@@ -50,25 +50,27 @@ Instead it returns `suggest` or `not_found` with a deterministic correction. Thi
 
 Exact item-name matching still occurs before structured parsing, so legitimate item names are unaffected.
 
+## Explicit routing confidence
+
+`ItemSearchOutcome` will expose a small internal routing-confidence signal instead of forcing the Universal router to infer intent from message text or result count.
+
+The signal is one of:
+
+- `strong` — exact item-name match or recognized structured item intent;
+- `weak` — fuzzy item-name fallback only;
+- `none` — no item interpretation.
+
+Structured `clarify`, `suggest`, help/meta, and item-specific refusal outcomes are marked `strong` because they clearly establish that the query belongs to the item domain even when they contain no result cards.
+
+This field is for routing only. It is not shown in the UI and does not change the public search wording.
+
 ## Universal routing
 
-Universal mode continues to call both domain services, but skill search will receive a strictness policy based on the item outcome.
-
-### Confident item outcomes
-
-The item side is considered confident when it produces one of these intent-bearing outcomes:
-
-- exact/structured item results;
-- stat-filter results;
-- clarification for an ambiguous stat;
-- a deterministic suggestion caused by recognized item syntax;
-- item help/meta/refusal responses.
-
-A plain fuzzy item-name result alone does not establish strong item intent.
+Universal mode searches the item domain first, then passes a strictness policy to the skill service based on `ItemSearchOutcome.routing_confidence`.
 
 ### Skill fallback policy
 
-When the item side is confident, the skill service may use only strong matching routes:
+When item routing confidence is `strong`, the skill service may use only strong matching routes:
 
 - exact skill name or alias;
 - explicit skill tree query;
@@ -82,7 +84,7 @@ Weak fallback is disabled in this situation:
 
 If no strong skill match exists, the skill outcome becomes `not_found` with no results. The UI therefore shows no irrelevant Skills cards.
 
-When the item side is not confident, Universal mode preserves the normal skill behavior, including fuzzy and lexical fallback.
+When item routing confidence is `weak` or `none`, Universal mode preserves the normal skill behavior, including fuzzy and lexical fallback.
 
 Skills-only mode is unchanged and continues to use the full skill search behavior.
 
@@ -120,9 +122,10 @@ The skill structured ailment route remains unchanged.
 Expected focused changes:
 
 - `toram_search/items/filters.py` for order-insensitive specific crysta-slot aliases and precedence;
-- `toram_search/items/service.py` for preventing fuzzy item-name fallback after recognized structured intent;
+- `toram_search/items/models.py` for the explicit routing-confidence field;
+- `toram_search/items/service.py` for assigning confidence and preventing fuzzy item-name fallback after recognized structured intent;
 - `toram_search/skills/service.py` for an explicit `allow_weak_fallback` (or equivalent) search policy;
-- `toram_search/router.py` for deriving Universal-mode skill strictness from the item outcome;
+- `toram_search/router.py` for applying Universal-mode skill strictness from the item outcome;
 - tests in `tests/test_item_search.py`, `tests/test_skill_search.py`, and/or `tests/test_universal.py`.
 
 No database schema changes are required.
@@ -135,10 +138,11 @@ Regression coverage must include the exact production bug using the real or repr
 2. `aggro wp xtal` behaves identically.
 3. Specific crysta-slot aliases beat generic `xtal` and `wp` aliases.
 4. A recognized structured item query with an unknown leftover token does not fall through to fuzzy item-name matching.
-5. When item intent is confident, weak skill fuzzy/FTS matches are suppressed.
-6. Exact skill matches still work under strict Universal routing.
-7. Skills-only mode retains fuzzy/FTS fallback behavior.
-8. Existing item, skill, Universal, autocomplete, UI, database, and compile tests remain green.
+5. Strong, weak, and none item routing confidence are assigned deterministically.
+6. With strong item confidence, weak skill fuzzy/FTS matches are suppressed.
+7. Exact or explicit structured skill matches still work under strict Universal routing.
+8. Skills-only mode retains fuzzy/FTS fallback behavior.
+9. Existing item, skill, Universal, autocomplete, UI, database, and compile tests remain green.
 
 ## Non-goals
 
