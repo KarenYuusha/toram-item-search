@@ -15,10 +15,10 @@ def _search_items(query: str, path: Path):
         service.close()
 
 
-def _search_skills(query: str, path: Path):
+def _search_skills(query: str, path: Path, *, allow_weak_fallback: bool = True):
     service = SkillSearchService(path)
     try:
-        return service.search(query)
+        return service.search(query, allow_weak_fallback=allow_weak_fallback)
     finally:
         service.close()
 
@@ -30,6 +30,22 @@ def search_database(
     items_path: Path,
     skills_path: Path,
 ) -> UniversalSearchOutcome:
-    items = _search_items(query, items_path) if mode in {'Universal', 'Items'} else None
-    skills = _search_skills(query, skills_path) if mode in {'Universal', 'Skills'} else None
-    return UniversalSearchOutcome(query=query, items=items, skills=skills)
+    if mode == 'Universal':
+        items = _search_items(query, items_path)
+        skills = _search_skills(
+            query,
+            skills_path,
+            allow_weak_fallback=items.routing_confidence != 'strong',
+        )
+        return UniversalSearchOutcome(query=query, items=items, skills=skills)
+    if mode == 'Items':
+        return UniversalSearchOutcome(
+            query=query,
+            items=_search_items(query, items_path),
+            skills=None,
+        )
+    return UniversalSearchOutcome(
+        query=query,
+        items=None,
+        skills=_search_skills(query, skills_path),
+    )
