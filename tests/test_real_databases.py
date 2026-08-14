@@ -3,6 +3,7 @@ import pytest
 from toram_search.database import ITEM_DATABASE, SKILL_DATABASE, validate_databases
 from toram_search.items.repository import ItemRepository
 from toram_search.items.service import ItemSearchService
+from toram_search.router import search_database
 from toram_search.skills.repository import SkillRepository
 from toram_search.skills.service import SkillSearchService
 
@@ -40,3 +41,21 @@ def test_committed_databases_support_representative_searches() -> None:
         skill_service.close()
     assert item_outcome.results
     assert any(row.skill.name.casefold() == 'guardian' for row in skill_outcome.results)
+
+
+def test_real_universal_aggro_xtal_wp_suppresses_unrelated_skills() -> None:
+    outcome = search_database(
+        'Universal',
+        'aggro xtal wp',
+        items_path=ITEM_DATABASE,
+        skills_path=SKILL_DATABASE,
+    )
+    assert outcome.items is not None
+    assert outcome.items.routing_confidence == 'strong'
+    assert outcome.items.results
+    assert {row.item.item_type for row in outcome.items.results} <= {
+        'Weapon Crysta',
+        'Enhancer Crysta (Red)',
+    }
+    assert outcome.skills is not None
+    assert not outcome.skills.results
