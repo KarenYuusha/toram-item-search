@@ -2,8 +2,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from rapidfuzz import fuzz
+
+from toram_search.interpretation import RouteQuality
 from .analytics import SkillAnalytics
 from .concepts import resolve_ailment
+from .interpretation import build_skill_interpretation
 from .lexical_search import lexical_search
 from .models import SkillCardResult, SkillFilter, SkillSearchOutcome
 from .normalization import normalize_skill_name
@@ -81,58 +84,104 @@ class SkillSearchService:
         return '\n\n'.join(bits)
     def search(self,query:str,*,allow_weak_fallback:bool=True)->SkillSearchOutcome:
         raw=' '.join(str(query).split());norm=normalize_skill_name(raw.strip(' ?!.'))
-        if not raw:return SkillSearchOutcome('not_found',raw,message='Enter a skill, tree, ailment, or objective skill query.')
-        if _SUBJECTIVE.search(raw):return SkillSearchOutcome('refuse',raw,message='This search compares objective database facts only; subjective DPS/tank/build recommendations are not supported.')
+
+        def finish(
+            kind,
+            results=(),
+            message=None,
+            suggested_queries=(),
+            family='none',
+            specificity=0,
+            interpretation=None,
+        ):
+            return SkillSearchOutcome(
+                kind,
+                raw,
+                results,
+                message,
+                suggested_queries,
+                interpretation,
+                RouteQuality(family, bool(results), specificity),
+            )
+
+        if not raw:return finish('not_found',message='Enter a skill, tree, ailment, or objective skill query.')
+        if _SUBJECTIVE.search(raw):return finish('refuse',message='This search compares objective database facts only; subjective DPS/tank/build recommendations are not supported.',family='structured')
         skills=self._find_skill_phrases(raw)
         if len(skills)>=2 and norm.startswith('compare '):
             a,b=skills[:2]
             msg=(f'{a.name} vs {b.name}\nTree: {self.repository.get_tree(a.tree_id).name} | {self.repository.get_tree(b.tree_id).name}\n'
                  f'Tier: {a.tier} | {b.tier}\nRequired Level: {a.required_level} | {b.required_level}\nMP: {a.mp_cost_text or "not recorded"} | {b.mp_cost_text or "not recorded"}\n'
                  f'Type: {a.skill_type or "not recorded"} | {b.skill_type or "not recorded"}')
-            return SkillSearchOutcome('compare',raw,self._cards((a,b)),msg)
+            return finish('compare',self._cards((a,b)),msg,family='exact',specificity=2)
         if len(skills)==1:
             s=skills[0]
-            if 'mp cost' in norm:return SkillSearchOutcome('structured',raw,self._cards((s,),'mp_cost_value'),f'{s.name}: MP {s.mp_cost_text or "not recorded"}')
-            if 'what tree' in norm:return SkillSearchOutcome('structured',raw,self._cards((s,)),f'{s.name} is in {self.repository.get_tree(s.tree_id).name}.')
-            if 'what tier' in norm:return SkillSearchOutcome('structured',raw,self._cards((s,),'tier'),f'{s.name}: Tier {s.tier if s.tier is not None else "not recorded"}')
+            if 'mp cost' in norm:return finish('structured',self._cards((s,),'mp_cost_value'),f'{s.name}: MP {s.mp_cost_text or "not recorded"}',family='exact',specificity=1)
+            if 'what tree' in norm:return finish('structured',self._cards((s,)),f'{s.name} is in {self.repository.get_tree(s.tree_id).name}.',family='exact',specificity=1)
+            if 'what tier' in norm:return finish('structured',self._cards((s,),'tier'),f'{s.name}: Tier {s.tier if s.tier is not None else "not recorded"}',family='exact',specificity=1)
             if (norm.startswith('how does ') and norm.endswith(' work')) or (norm.startswith('what does ') and norm.endswith(' do')):
-                return SkillSearchOutcome('structured',raw,self._cards((s,)),self._stored_detail(s))
+                return finish('structured',self._cards((s,)),self._stored_detail(s),family='exact',specificity=1)
             if norm in {normalize_skill_name(s.name),*(normalize_skill_name(a) for a in s.aliases)}:
-                return SkillSearchOutcome('results',raw,self._cards((s,)))
+                return finish('results',self._cards((s,)),family='exact',specificity=1)
         structured_filter=self._structured_filter_from_query(norm)
         has_explicit_filter=bool(structured_filter.tiers or structured_filter.skill_types or structured_filter.ailments or structured_filter.mp_cost_max is not None or structured_filter.required_level_max is not None)
         if has_explicit_filter:
             rows=self.analytics.filter_skills(structured_filter)
+            unsupported=bool(structured_filter.tiers or structured_filter.skill_types or structured_filter.weapons)
+            tree_name=None
+            if structured_filter.tree_ids:
+                tree_name=self.repository.get_tree(structured_filter.tree_ids[0]).name
+            interpretation=build_skill_interpretation(
+                tree_name=tree_name,
+                ailment=structured_filter.ailments[0] if structured_filter.ailments else None,
+                mp_cost_max=structured_filter.mp_cost_max,
+                required_level_max=structured_filter.required_level_max,
+                count_mode=norm.startswith('how many'),
+                unsupported_structured_component=unsupported,
+            )
+            specificity=(
+                len(structured_filter.tree_ids)
+                + len(structured_filter.tiers)
+                + len(structured_filter.skill_types)
+                + len(structured_filter.ailments)
+                + len(structured_filter.weapons)
+                + int(structured_filter.mp_cost_max is not None)
+                + int(structured_filter.required_level_max is not None)
+            )
             if norm.startswith('how many'):
-                return SkillSearchOutcome('structured',raw,message=f'{len(rows)} skills match those database filters.')
-            return SkillSearchOutcome('results' if rows else 'not_found',raw,self._cards(rows),None if rows else 'No matching skills found.')
+                return finish('structured',message=f'{len(rows)} skills match those database filters.',family='structured',specificity=specificity,interpretation=interpretation)
+            cards=self._cards(rows)
+            return finish('results' if cards else 'not_found',cards,None if cards else 'No matching skills found.',family='structured',specificity=specificity,interpretation=interpretation)
         for tree_name in self.repository.list_tree_names():
             tree=self.repository.resolve_tree_name(tree_name)[0];tn=normalize_skill_name(tree.name);short=tn[:-7].strip() if tn.endswith(' skills') else tn
             if norm in {tn,short,f'{short} skill tree',f'{short} skills tree'} or (short in norm and ('skill tree' in norm or 'skills' in norm)):
                 rows=self.repository.list_skills_in_tree(tree.id)
                 if 'mp' in norm and any(x in norm for x in ('lowest','least','highest')):
                     direction='desc' if 'highest' in norm else 'asc';rows=self.analytics.rank('mp_cost_value',direction,filters=SkillFilter(tree_ids=(tree.id,)),limit=20)
-                    return SkillSearchOutcome('results',raw,self._cards(rows,'mp_cost_value'))
-                return SkillSearchOutcome('results',raw,self._cards(rows))
+                    interpretation=build_skill_interpretation(tree_name=tree.name,mp_rank_direction=direction)
+                    return finish('results',self._cards(rows,'mp_cost_value'),family='structured',specificity=2,interpretation=interpretation)
+                cards=self._cards(rows)
+                return finish('results' if cards else 'not_found',cards,None if cards else 'No matching skills found.',family='structured',specificity=1,interpretation=build_skill_interpretation(tree_name=tree.name))
         for ailment in self.repository.list_known_ailments():
             n=normalize_skill_name(ailment)
             if n in norm and any(w in norm for w in ('inflict','inflicts','cause','causes','ailment','skills')):
                 canonical=resolve_ailment(ailment,self.repository.list_known_ailments()) or ailment
                 rows=self.analytics.filter_skills(SkillFilter(ailments=(canonical,)))
-                return SkillSearchOutcome('results' if rows else 'not_found',raw,self._cards(rows,'ailments'),None if rows else 'No matching skills found.')
+                cards=self._cards(rows,'ailments')
+                return finish('results' if cards else 'not_found',cards,None if cards else 'No matching skills found.',family='structured',specificity=1,interpretation=build_skill_interpretation(ailment=canonical))
         if 'mp' in norm and any(w in norm for w in ('lowest','least','highest')):
             direction='desc' if 'highest' in norm else 'asc';rows=self.analytics.rank('mp_cost_value',direction,limit=20)
-            return SkillSearchOutcome('results' if rows else 'not_found',raw,self._cards(rows,'mp_cost_value'))
+            cards=self._cards(rows,'mp_cost_value')
+            return finish('results' if cards else 'not_found',cards,None if cards else 'No matching skills found.',family='structured',specificity=1,interpretation=build_skill_interpretation(mp_rank_direction=direction))
         exact=self.repository.resolve_skill_name(raw)
-        if exact:return SkillSearchOutcome('results',raw,self._cards(exact))
+        if exact:return finish('results',self._cards(exact),family='exact',specificity=1)
         if not allow_weak_fallback:
-            return SkillSearchOutcome('not_found',raw,message='No matching skill database information found.')
+            return finish('not_found',message='No matching skill database information found.')
         fuzzy=[]
         for s in self.repository.all_skills():
             score=max(float(fuzz.WRatio(norm,s.normalized_name)),float(fuzz.token_set_ratio(norm,s.normalized_name)))
             if score>=88:fuzzy.append((score,s))
         if fuzzy:
-            fuzzy.sort(key=lambda x:(-x[0],x[1].normalized_name,x[1].id));return SkillSearchOutcome('results',raw,self._cards(tuple(s for _,s in fuzzy[:20])))
+            fuzzy.sort(key=lambda x:(-x[0],x[1].normalized_name,x[1].id));return finish('results',self._cards(tuple(s for _,s in fuzzy[:20])),family='weak')
         hits=lexical_search(self.repository,raw,limit=20)
-        if hits:return SkillSearchOutcome('results',raw,self._cards(tuple(self.repository.get_skill(h.skill_id) for h in hits)))
-        return SkillSearchOutcome('not_found',raw,message='No matching skill database information found.')
+        if hits:return finish('results',self._cards(tuple(self.repository.get_skill(h.skill_id) for h in hits)),family='weak')
+        return finish('not_found',message='No matching skill database information found.')
