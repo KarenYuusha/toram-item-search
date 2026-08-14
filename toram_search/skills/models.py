@@ -2,6 +2,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from toram_search.interpretation import QueryInterpretation, RouteQuality
+
 @dataclass(frozen=True)
 class SkillSection:
     position: int
@@ -72,3 +74,5 @@ class SkillSearchOutcome:
     results: tuple[SkillCardResult, ...] = ()
     message: str | None = None
     suggested_queries: tuple[str, ...] = ()
+    interpretation: QueryInterpretation | None = None
+    route_quality: RouteQuality = RouteQuality()
