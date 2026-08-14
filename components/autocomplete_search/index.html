@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="./streamlit_bridge.js"></script>
+  <style>
+    :root { color-scheme: light dark; font-family: "Source Sans Pro", Arial, sans-serif; }
+    body { margin: 0; background: transparent; }
+    .search-row { display: flex; gap: .5rem; align-items: stretch; }
+    .autocomplete-wrap { position: relative; flex: 1 1 auto; min-width: 0; }
+    .autocomplete-input, .autocomplete-ghost { box-sizing: border-box; width: 100%; min-height: 44px; padding: .55rem .8rem; border-radius: .55rem; font: inherit; font-size: 1rem; line-height: 1.4; white-space: pre; }
+    .autocomplete-input { position: relative; z-index: 2; border: 1px solid rgba(128,128,128,.35); background: transparent; color: inherit; outline: none; }
+    .autocomplete-input:focus { border-color: #ff4b4b; box-shadow: 0 0 0 1px #ff4b4b; }
+    .autocomplete-ghost { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; border: 1px solid transparent; color: rgba(128,128,128,.65); }
+    .typed-space { visibility: hidden; }
+    #submit { min-width: 90px; border: 0; border-radius: .55rem; padding: 0 1rem; font: inherit; font-weight: 600; background: #ff4b4b; color: white; cursor: pointer; }
+    #submit:disabled { opacity: .55; cursor: default; }
+    .hint { margin-top: .25rem; color: rgba(128,128,128,.9); font-size: .82rem; }
+    .suggestion-list { display: none; margin-top: .35rem; border: 1px solid rgba(128,128,128,.25); border-radius: .55rem; overflow: hidden; }
+    .suggestion-list.visible { display: block; }
+    .suggestion-item { display: flex; gap: .75rem; align-items: center; justify-content: space-between; padding: .48rem .68rem; cursor: pointer; font-size: .94rem; }
+    .suggestion-item:hover, .suggestion-item.active { background: rgba(255,75,75,.12); }
+    .suggestion-kind { flex: 0 0 auto; font-size: .75rem; opacity: .7; border: 1px solid rgba(128,128,128,.25); border-radius: 999px; padding: .08rem .42rem; }
+    @media (max-width: 520px) { .search-row { flex-wrap: wrap; } #submit { min-height: 42px; width: 100%; } }
+  </style>
+</head>
+<body>
+  <div class="search-row">
+    <div class="autocomplete-wrap">
+      <div id="ghost" class="autocomplete-ghost"></div>
+      <input id="query" class="autocomplete-input" type="text" autocomplete="off" spellcheck="false" />
+    </div>
+    <button id="submit" type="button">Search</button>
+  </div>
+  <div id="hint" class="hint">Press Tab to accept the best suggestion. Press Enter to search.</div>
+  <div id="suggestions" class="suggestion-list"></div>
+
+  <script>
+    const input = document.getElementById("query");
+    const ghost = document.getElementById("ghost");
+    const hint = document.getElementById("hint");
+    const submitButton = document.getElementById("submit");
+    const suggestionsEl = document.getElementById("suggestions");
+    let suggestions = [];
+    let currentSuggestion = null;
+    let submitNonce = 0;
+
+    function normalize(value) { return String(value || "").toLowerCase().replace(/[^a-z0-9%:+-]+/g, " ").trim(); }
+    function fuzzyScore(query, candidate) {
+      const q = normalize(query); const c = normalize(candidate);
+      if (!q || !c) return 0;
+      if (c === q) return 10000;
+      if (c.startsWith(q)) return 9000 - Math.min(c.length, 500);
+      if (c.includes(q)) return 7500 - c.indexOf(q);
+      let score = 0; let lastIndex = -1; let streak = 0;
+      for (const ch of q) {
+        const index = c.indexOf(ch, lastIndex + 1);
+        if (index === -1) return 0;
+        streak = index === lastIndex + 1 ? streak + 1 : 1;
+        score += 10 + streak * 4 - Math.min(index - lastIndex, 8);
+        lastIndex = index;
+      }
+      return score - Math.abs(c.length - q.length) * .2;
+    }
+    function suggestionText(item) { return `${item.value || ""} ${item.label || ""} ${item.kind || ""}`; }
+    function getMatches(value, limit = 6) {
+      const typed = String(value || "").trim(); if (!typed) return [];
+      return suggestions.map((item) => ({ item, score: fuzzyScore(typed, suggestionText(item)) }))
+        .filter((entry) => entry.score > 0 && normalize(entry.item.value) !== normalize(typed))
+        .sort((a, b) => b.score - a.score || String(a.item.label).localeCompare(String(b.item.label)))
+        .slice(0, limit).map((entry) => entry.item);
+    }
+    function renderSuggestions(matches) {
+      suggestionsEl.replaceChildren(); suggestionsEl.classList.toggle("visible", matches.length > 0);
+      for (const match of matches) {
+        const item = document.createElement("div"); item.className = "suggestion-item";
+        const label = document.createElement("span"); label.textContent = match.label || match.value;
+        const kind = document.createElement("span"); kind.className = "suggestion-kind"; kind.textContent = match.kind || "";
+        item.append(label, kind);
+        item.addEventListener("mousedown", (event) => { event.preventDefault(); acceptSuggestion(match); });
+        suggestionsEl.appendChild(item);
+      }
+    }
+    function updatePreview() {
+      const matches = getMatches(input.value); currentSuggestion = matches[0] || null;
+      if (currentSuggestion && normalize(currentSuggestion.value).startsWith(normalize(input.value))) {
+        const typedNode = document.createElement("span"); typedNode.className = "typed-space"; typedNode.textContent = input.value;
+        ghost.replaceChildren(typedNode, document.createTextNode(String(currentSuggestion.value).slice(input.value.length)));
+      } else { ghost.replaceChildren(); }
+      hint.textContent = currentSuggestion ? `Best match: ${currentSuggestion.label || currentSuggestion.value}. Press Tab to fill it.` : "Press Tab to accept the best suggestion. Press Enter to search.";
+      renderSuggestions(matches); Streamlit.setFrameHeight(document.body.scrollHeight);
+    }
+    function acceptSuggestion(match) { input.value = match.value || ""; updatePreview(); input.focus(); }
+    function submitQuery() {
+      const value = input.value.trim(); if (!value) return;
+      submitNonce = Math.max(Date.now(), submitNonce + 1);
+      Streamlit.setComponentValue({ event: "submit", value, nonce: submitNonce });
+    }
+    input.addEventListener("input", updatePreview);
+    input.addEventListener("focus", updatePreview);
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Tab" && currentSuggestion) { event.preventDefault(); acceptSuggestion(currentSuggestion); return; }
+      if (event.key === "Enter") { event.preventDefault(); submitQuery(); }
+    });
+    submitButton.addEventListener("click", submitQuery);
+    Streamlit.events.addEventListener(Streamlit.RENDER_EVENT, (event) => {
+      const args = event.detail.args || {};
+      suggestions = Array.isArray(args.suggestions) ? args.suggestions : [];
+      const value = args.value || "";
+      if (document.activeElement !== input && input.value !== value) input.value = value;
+      input.placeholder = args.placeholder || "Search items, stats, skills...";
+      const disabled = Boolean(args.disabled);
+      input.disabled = disabled; submitButton.disabled = disabled;
+      updatePreview(); Streamlit.setFrameHeight(document.body.scrollHeight);
+    });
+    Streamlit.setComponentReady();
+  </script>
+</body>
+</html>
