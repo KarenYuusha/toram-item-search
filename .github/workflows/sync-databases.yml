@@ -1,5 +1,6 @@
 name: Sync canonical databases
 
+# Temporary one-shot sync used by the implementation branch.
 on:
   push:
     branches:
