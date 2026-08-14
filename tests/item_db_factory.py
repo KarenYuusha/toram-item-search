@@ -46,6 +46,7 @@ def create_item_database(path: Path) -> None:
         (6,6,0,'Aggro %',-10,'[]',None,None,0),
         (8,7,0,'Aggro %',15,'[]',None,None,0),
         (9,8,0,'Critical Rate',1,'[]',None,None,0),
+        (10,7,1,'Aggro %',5,'[]','while condition is active',None,0),
     ]
     db.executemany('INSERT INTO item_stats VALUES (?,?,?,?,?,?,?,?,?)', stats)
     db.execute("INSERT INTO item_sources VALUES (1,1,0,10,'Test Monster',100,'Test Map',NULL,'https://example.com/monster',NULL,'[]')")
