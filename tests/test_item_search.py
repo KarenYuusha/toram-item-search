@@ -96,6 +96,16 @@ def test_failed_stat_shape_suggests_canonical_query(tmp_path: Path) -> None:
     assert any('bow' in q.casefold() for q in outcome.suggested_queries)
 
 
+def test_crit_bow_offers_clickable_canonical_choices(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    try:
+        outcome = service.search('crit bow')
+    finally:
+        service.close()
+    assert outcome.kind == 'clarify'
+    assert outcome.suggested_queries == ('Critical Rate Bow','Critical Damage Bow')
+
+
 def test_negative_stat_search_matches_negative_values(tmp_path: Path) -> None:
     service = make_service(tmp_path)
     try:
