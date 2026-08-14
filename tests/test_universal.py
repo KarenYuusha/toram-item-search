@@ -22,6 +22,23 @@ def test_skills_mode_does_not_need_item_database(tmp_path:Path)->None:
     skills=tmp_path/'skills.sqlite';create_skill_database(skills);outcome=search_database('Skills','Guardian',items_path=tmp_path/'missing-items.sqlite',skills_path=skills);assert outcome.items is None;assert outcome.skills is not None
 
 
+def test_skills_mode_keeps_weak_fts_fallback(tmp_path:Path)->None:
+    skills=tmp_path/'skills.sqlite';create_skill_database(skills)
+    outcome=search_database('Skills','protects party members',items_path=tmp_path/'missing-items.sqlite',skills_path=skills)
+    assert outcome.items is None
+    assert outcome.skills is not None
+    assert [row.skill.name for row in outcome.skills.results]==['Guardian']
+
+
+def test_universal_no_item_intent_keeps_weak_skill_fallback(tmp_path:Path)->None:
+    items,skills=databases(tmp_path)
+    outcome=search_database('Universal','protects party members',items_path=items,skills_path=skills)
+    assert outcome.items is not None
+    assert outcome.items.routing_confidence=='none'
+    assert outcome.skills is not None
+    assert [row.skill.name for row in outcome.skills.results]==['Guardian']
+
+
 def test_universal_aggro_xtal_wp_returns_weapon_crysta_without_unrelated_skills(tmp_path:Path)->None:
     items,skills=databases(tmp_path)
     outcome=search_database('Universal','aggro xtal wp',items_path=items,skills_path=skills)
@@ -68,7 +85,7 @@ def test_items_autocomplete_does_not_need_skill_database(tmp_path:Path)->None:
 
 
 def test_skills_autocomplete_does_not_need_item_database(tmp_path:Path)->None:
-    skills=tmp_path/'skills.sqlite';create_skill_database(skills);rows=build_autocomplete_index('Skills',items_path=tmp_path/'missing-items.sqlite',skills_path=skills);assert rows;assert all(r.kind in {'Skill','Skill Tree','Ailment'} for r in rows)
+    skills=tmp_path/'skills.sqlite';create_skill_database(skills);rows=build_autocomplete_index('Skills',items_path=tmp_path/'missing-items.sqlite');assert rows;assert all(r.kind in {'Skill','Skill Tree','Ailment'} for r in rows)
 
 
 def test_suggestions_for_mode_filters_prebuilt_universal_index(tmp_path:Path)->None:
