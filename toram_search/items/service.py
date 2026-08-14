@@ -34,6 +34,16 @@ class ItemSearchService:
             s=float(fuzz.WRatio(expanded,normalize_stat_text(name)))
             if s>score: best,score=name,s
         return (best,()) if best and score>=88 else (None,())
+    @staticmethod
+    def _group_stat_rows(rows):
+        grouped={}
+        order=[]
+        for item,match in rows:
+            if item.id not in grouped:
+                grouped[item.id]=[item,[]]
+                order.append(item.id)
+            grouped[item.id][1].append(match)
+        return tuple(ItemCardResult(grouped[item_id][0],tuple(grouped[item_id][1])) for item_id in order)
     def search(self,query:str)->ItemSearchOutcome:
         raw=' '.join(str(query).split())
         if not raw:return ItemSearchOutcome('not_found',raw,message='Enter an item name or stat query.',routing_confidence='none')
@@ -89,7 +99,8 @@ class ItemSearchService:
                 rows.sort(key=lambda row: (row[1].amount, row[0].name.casefold(), row[0].id))
             elif rank_direction == 'asc':
                 rows.sort(key=lambda row: (row[1].amount, row[0].name.casefold(), row[0].id))
-            return ItemSearchOutcome('results' if rows else 'not_found',raw,tuple(ItemCardResult(i,(m,)) for i,m in rows),None if rows else 'No matching items found.',routing_confidence='strong')
+            cards=self._group_stat_rows(rows)
+            return ItemSearchOutcome('results' if cards else 'not_found',raw,cards,None if cards else 'No matching items found.',routing_confidence='strong')
         if looks_expression:
             try: expr=parse_stat_expression(raw,self.repository.list_item_types(),self.repository.list_stat_names())
             except StatQuerySyntaxError as exc: return ItemSearchOutcome('suggest',raw,message=str(exc),routing_confidence='strong')
