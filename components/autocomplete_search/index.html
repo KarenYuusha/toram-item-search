@@ -45,6 +45,7 @@
     let suggestions = [];
     let currentSuggestion = null;
     let submitNonce = 0;
+    let lastExternalValue = null;
 
     function normalize(value) { return String(value || "").toLowerCase().replace(/[^a-z0-9%:+-]+/g, " ").trim(); }
     function fuzzyScore(query, candidate) {
@@ -108,7 +109,8 @@
       const args = event.detail.args || {};
       suggestions = Array.isArray(args.suggestions) ? args.suggestions : [];
       const value = args.value || "";
-      if (document.activeElement !== input && input.value !== value) input.value = value;
+      if (lastExternalValue === null || value !== lastExternalValue) input.value = value;
+      lastExternalValue = value;
       input.placeholder = args.placeholder || "Search items, stats, skills...";
       const disabled = Boolean(args.disabled);
       input.disabled = disabled; submitButton.disabled = disabled;

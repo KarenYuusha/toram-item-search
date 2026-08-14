@@ -10,3 +10,10 @@ def test_component_click_accepts_without_submission()->None:
 def test_component_uses_text_content_for_database_labels()->None:
     text=component_text();assert '.textContent = match.label' in text;assert '.textContent = match.kind' in text
 def test_component_reads_disabled_state_from_render_args()->None:assert 'Boolean(args.disabled)' in component_text()
+
+def test_external_fill_syncs_when_streamlit_value_changes_even_if_input_keeps_focus()->None:
+    text=component_text()
+    render=text[text.index('Streamlit.events.addEventListener(Streamlit.RENDER_EVENT'):]
+    assert 'lastExternalValue' in text
+    assert 'value !== lastExternalValue' in render
+    assert 'document.activeElement !== input' not in render

@@ -30,6 +30,12 @@ def test_result_corrections_are_clickable_fill_values()->None:
     assert 'return query.strip() or None' in source
 
 
+def test_result_corrections_are_visibly_action_buttons()->None:
+    source=text('ui/results.py')
+    assert "Click a suggestion to fill the search bar:" in source
+    assert "f'Use: {query}'" in source
+
+
 def test_skill_ui_uses_shared_icon_catalog()->None:
     cards=text('ui/skill_cards.py');dialog=text('ui/skill_dialog.py')
     assert 'DEFAULT_SKILL_ICON_CATALOG' in cards

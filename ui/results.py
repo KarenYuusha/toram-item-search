@@ -14,11 +14,11 @@ def _render_message(kind:str,message:str|None,suggestions:tuple[str,...],*,key_p
         else: st.write(message)
     if not suggestions:
         return None
-    st.caption('Try:')
+    st.caption('Click a suggestion to fill the search bar:')
     columns=st.columns(min(len(suggestions),4))
     for index,query in enumerate(suggestions):
         with columns[index%len(columns)]:
-            if st.button(query,key=f'{key_prefix}_suggestion_{index}_{query}',use_container_width=True):
+            if st.button(f'Use: {query}',key=f'{key_prefix}_suggestion_{index}_{query}',use_container_width=True):
                 return query.strip() or None
     return None
 
