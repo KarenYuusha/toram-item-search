@@ -53,9 +53,9 @@ def test_real_universal_aggro_xtal_wp_suppresses_unrelated_skills() -> None:
     assert outcome.items is not None
     assert outcome.items.routing_confidence == 'strong'
     assert outcome.items.results
-    assert {row.item.item_type for row in outcome.items.results} <= {
-        'Weapon Crysta',
-        'Enhancer Crysta (Red)',
+    assert {row.item.item_type.casefold() for row in outcome.items.results} <= {
+        'weapon crysta',
+        'enhancer crysta (red)',
     }
     assert outcome.skills is not None
     assert not outcome.skills.results
