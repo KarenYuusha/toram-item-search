@@ -4,7 +4,7 @@
 
 **Goal:** Add deterministic removable query-interpretation chips below the Streamlit search box, sourced from the same parser decisions that drive item/skill search, with semantic fill-only reconstruction and deterministic Universal-domain selection.
 
-**Architecture:** Introduce a small domain-neutral interpretation model containing chip metadata, precomputed safe reconstruction targets, and route-quality metadata. Item and skill search services attach interpretation/quality metadata while preserving current search results. The top-level router chooses the single winning interpretation in Universal mode, and a small Streamlit renderer turns the selected chips into fill-only buttons that clear stale results without submitting a new search.
+**Architecture:** Add a small domain-neutral model for chip metadata and route quality. Item and skill services attach metadata from their existing parse branches; domain-specific helper modules precompute safe canonical queries for each chip removal. The top-level router selects one winning interpretation, and Streamlit only renders buttons and applies the returned fill-only query.
 
 **Tech Stack:** Python 3.12 in CI, Streamlit 1.61.x, SQLite read-only repositories, RapidFuzz 3.x, pytest 8.x.
 
@@ -27,20 +27,16 @@
 
 ## File Structure
 
-- Create `toram_search/interpretation.py` — shared immutable chip, interpretation, and route-quality types; no domain imports.
-- Create `toram_search/items/interpretation.py` — item-only canonicalization and semantic reconstruction from already-parsed item structures.
-- Modify `toram_search/items/filters.py` — expose a canonical query fragment for `ItemTypeFilter` so aliases such as `xtal wp` reconstruct as `weapon xtal`.
-- Modify `toram_search/items/models.py` — attach optional interpretation and route-quality metadata to `ItemSearchOutcome` while retaining `routing_confidence`.
-- Modify `toram_search/items/service.py` — populate item interpretation/quality from the same branches that execute item search.
-- Create `toram_search/skills/interpretation.py` — skill-only supported-filter interpretation and canonical reconstruction.
-- Modify `toram_search/skills/models.py` — attach optional interpretation and route-quality metadata to `SkillSearchOutcome`.
-- Modify `toram_search/skills/service.py` — populate skill interpretation/quality from existing parsed filters/tree/ailment/ranking branches without creating a second parser.
-- Modify `toram_search/models.py` — add the single selected interpretation to `UniversalSearchOutcome`.
-- Modify `toram_search/router.py` — select the winning interpretation deterministically while leaving actual domain search routing unchanged.
-- Create `ui/interpretation.py` — render removable chip buttons and return the precomputed fill-only query.
-- Modify `main.py` — place chips below the search box and clear stale state on chip removal.
-- Create `tests/test_interpretation.py` — shared model/route-quality unit tests.
-- Modify `tests/test_item_search.py`, `tests/test_skill_search.py`, `tests/test_universal.py`, `tests/test_app_shell.py`, `tests/test_ui_contract.py`, and `tests/test_real_databases.py` — regression and integration coverage.
+- Create `toram_search/interpretation.py` — immutable chip, interpretation, and route-quality types with no domain imports.
+- Create `toram_search/items/interpretation.py` — item canonicalization and semantic reconstruction from resolved stat/filter or parsed expression objects.
+- Modify `toram_search/items/filters.py` — expose canonical item-type text.
+- Modify `toram_search/items/models.py` — attach optional interpretation and route quality while retaining `routing_confidence`.
+- Modify `toram_search/items/service.py` — attach item metadata from existing branches.
+- Create `toram_search/skills/interpretation.py` — canonical reconstruction for supported skill filters.
+- Modify `toram_search/skills/models.py` and `toram_search/skills/service.py` — attach skill metadata from existing branches.
+- Modify `toram_search/models.py` and `toram_search/router.py` — expose/select one winning interpretation.
+- Create `ui/interpretation.py` and modify `main.py` — render chips and apply fill-only state changes.
+- Create `tests/test_interpretation.py`; modify item, skill, Universal, AppTest, UI-contract, and real-database tests.
 
 ---
 
@@ -51,13 +47,13 @@
 - Create: `tests/test_interpretation.py`
 
 **Interfaces:**
-- Produces: `QueryChip`, `QueryInterpretation`, `RouteQuality`, `ChipKind`, `SearchDomain`, and `RouteFamily`.
-- `QueryInterpretation.query_without(chip_id: str) -> str` is the only reconstruction interface the UI will use.
-- `RouteQuality.sort_key -> tuple[int, int, int]` is the only quality ordering the Universal router will use.
+- Produces `QueryChip`, `QueryInterpretation`, `RouteQuality`, `ChipKind`, `SearchDomain`, `RouteFamily`.
+- `QueryInterpretation.query_without(chip_id: str) -> str` is the only reconstruction call used by UI code.
+- `RouteQuality.sort_key -> tuple[int, int, int]` is the only quality ordering used by Universal selection.
 
-- [ ] **Step 1: Write failing tests for safe chip lookup and route ordering**
+- [ ] **Step 1: Write failing shared-model tests**
 
-Create `tests/test_interpretation.py` with:
+Create `tests/test_interpretation.py`:
 
 ```python
 import pytest
@@ -65,13 +61,13 @@ import pytest
 from toram_search.interpretation import QueryChip, QueryInterpretation, RouteQuality
 
 
-def test_query_interpretation_returns_precomputed_semantic_removal_query() -> None:
+def test_query_interpretation_returns_precomputed_removal_query() -> None:
     interpretation = QueryInterpretation(
         domain='Items',
         canonical_query='highest critical rate bow',
         chips=(
-            QueryChip('rank', 'rank', 'Highest', 'highest', 'critical rate bow'),
-            QueryChip('stat', 'stat', 'Critical Rate', 'critical rate', 'bow', depends_on=()),
+            QueryChip('rank', 'rank', 'Highest', 'highest', 'critical rate bow', ('stat',)),
+            QueryChip('stat', 'stat', 'Critical Rate', 'critical rate', 'bow'),
             QueryChip('item_type', 'item_type', 'Bow', 'bow', 'highest critical rate'),
         ),
     )
@@ -86,25 +82,19 @@ def test_query_interpretation_rejects_unknown_chip_id() -> None:
 
 
 def test_route_quality_matches_approved_priority() -> None:
-    exact_results = RouteQuality('exact', True, 1)
-    structured_results = RouteQuality('structured', True, 3)
-    structured_empty = RouteQuality('structured', False, 4)
-    weak_results = RouteQuality('weak', True, 99)
-    none = RouteQuality('none', False, 99)
-
-    assert exact_results.sort_key > structured_results.sort_key
-    assert structured_results.sort_key > structured_empty.sort_key
-    assert structured_empty.sort_key > weak_results.sort_key
-    assert weak_results.sort_key > none.sort_key
+    assert RouteQuality('exact', True, 1).sort_key > RouteQuality('structured', True, 9).sort_key
+    assert RouteQuality('structured', True, 1).sort_key > RouteQuality('structured', False, 9).sort_key
+    assert RouteQuality('structured', False, 1).sort_key > RouteQuality('weak', True, 99).sort_key
+    assert RouteQuality('weak', True, 1).sort_key > RouteQuality('none', False, 99).sort_key
 
 
-def test_route_quality_uses_specificity_only_after_family_quality() -> None:
+def test_route_quality_uses_specificity_only_after_route_family() -> None:
     broad = RouteQuality('structured', True, 1)
     narrow = RouteQuality('structured', True, 3)
     assert narrow.sort_key > broad.sort_key
 ```
 
-- [ ] **Step 2: Run the new tests and confirm RED**
+- [ ] **Step 2: Confirm RED**
 
 Run:
 
@@ -112,11 +102,11 @@ Run:
 python -m pytest tests/test_interpretation.py -q
 ```
 
-Expected: collection fails because `toram_search.interpretation` does not exist.
+Expected: import/collection failure because `toram_search.interpretation` does not exist.
 
-- [ ] **Step 3: Implement the immutable shared model**
+- [ ] **Step 3: Implement the shared model exactly**
 
-Create `toram_search/interpretation.py` with this public shape:
+Create `toram_search/interpretation.py`:
 
 ```python
 from __future__ import annotations
@@ -125,14 +115,8 @@ from dataclasses import dataclass
 from typing import Literal
 
 ChipKind = Literal[
-    'stat',
-    'item_type',
-    'numeric_stat',
-    'rank',
-    'skill_tree',
-    'ailment',
-    'mp',
-    'required_level',
+    'stat', 'item_type', 'numeric_stat', 'rank',
+    'skill_tree', 'ailment', 'mp', 'required_level',
 ]
 SearchDomain = Literal['Items', 'Skills']
 RouteFamily = Literal['exact', 'structured', 'weak', 'none']
@@ -181,14 +165,7 @@ class RouteQuality:
         return result_tier, family_rank, self.specificity
 ```
 
-Rationale encoded in the type:
-- `query_without` is precomputed by the domain parser/builder, so the UI never edits raw strings.
-- exact and structured routes with results share the top result tier, but exact wins the quality tie.
-- specificity breaks ties between routes of the same family without consulting result count.
-
-- [ ] **Step 4: Run the shared-model tests and confirm GREEN**
-
-Run:
+- [ ] **Step 4: Confirm GREEN**
 
 ```bash
 python -m pytest tests/test_interpretation.py -q
@@ -196,7 +173,7 @@ python -m pytest tests/test_interpretation.py -q
 
 Expected: all tests pass.
 
-- [ ] **Step 5: Commit Task 1**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add toram_search/interpretation.py tests/test_interpretation.py
@@ -205,7 +182,7 @@ git commit -m "feat: add query interpretation model"
 
 ---
 
-### Task 2: Item interpretations and semantic expression reconstruction
+### Task 2: Item interpretations and AST-based reconstruction
 
 **Files:**
 - Create: `toram_search/items/interpretation.py`
@@ -215,12 +192,12 @@ git commit -m "feat: add query interpretation model"
 - Modify: `tests/test_item_search.py`
 
 **Interfaces:**
-- Consumes: `QueryChip`, `QueryInterpretation`, `RouteQuality` from Task 1.
-- Produces: `build_simple_item_interpretation(...) -> QueryInterpretation | None` and `build_expression_item_interpretation(expr: ParsedStatExpression) -> QueryInterpretation | None`.
 - `ItemTypeFilter` gains `canonical_text: str`.
-- `ItemSearchOutcome` gains `interpretation: QueryInterpretation | None` and `route_quality: RouteQuality` while retaining `routing_confidence` unchanged.
+- `build_simple_item_interpretation(stat: str, item_filter: ItemTypeFilter | None, rank_direction: str | None, negative_stat: bool) -> QueryInterpretation`.
+- `build_expression_item_interpretation(expr: ParsedStatExpression) -> QueryInterpretation`.
+- `ItemSearchOutcome` gains `interpretation: QueryInterpretation | None` and `route_quality: RouteQuality` after the existing fields.
 
-- [ ] **Step 1: Add item regression tests before production changes**
+- [ ] **Step 1: Add failing item tests**
 
 Append to `tests/test_item_search.py`:
 
@@ -231,17 +208,16 @@ def test_item_interpretation_for_aggro_weapon_crysta_is_canonical_and_removable(
         outcome = service.search('aggro xtal wp')
     finally:
         service.close()
-
-    assert outcome.interpretation is not None
-    assert outcome.interpretation.domain == 'Items'
-    assert [(c.kind, c.label) for c in outcome.interpretation.chips] == [
+    interpretation = outcome.interpretation
+    assert interpretation is not None
+    assert [(c.kind, c.label) for c in interpretation.chips] == [
         ('stat', 'Aggro %'),
         ('item_type', 'Weapon Crysta'),
     ]
-    item_type = next(c for c in outcome.interpretation.chips if c.kind == 'item_type')
-    stat = next(c for c in outcome.interpretation.chips if c.kind == 'stat')
-    assert outcome.interpretation.query_without(item_type.id) == 'aggro'
-    assert outcome.interpretation.query_without(stat.id) == 'weapon xtal'
+    item_type = next(c for c in interpretation.chips if c.kind == 'item_type')
+    stat = next(c for c in interpretation.chips if c.kind == 'stat')
+    assert interpretation.query_without(item_type.id) == 'aggro'
+    assert interpretation.query_without(stat.id) == 'weapon xtal'
 
 
 def test_rank_chip_depends_on_stat_and_reconstructs_canonically(tmp_path: Path) -> None:
@@ -250,13 +226,10 @@ def test_rank_chip_depends_on_stat_and_reconstructs_canonically(tmp_path: Path) 
         outcome = service.search('highest cr bow')
     finally:
         service.close()
-
     interpretation = outcome.interpretation
     assert interpretation is not None
     assert [(c.kind, c.label) for c in interpretation.chips] == [
-        ('rank', 'Highest'),
-        ('stat', 'Critical Rate'),
-        ('item_type', 'Bow'),
+        ('rank', 'Highest'), ('stat', 'Critical Rate'), ('item_type', 'Bow'),
     ]
     rank = next(c for c in interpretation.chips if c.kind == 'rank')
     stat = next(c for c in interpretation.chips if c.kind == 'stat')
@@ -273,30 +246,38 @@ def test_numeric_comparison_is_one_atomic_chip(tmp_path: Path) -> None:
         outcome = service.search('hp >= 5000 armor')
     finally:
         service.close()
-
     interpretation = outcome.interpretation
     assert interpretation is not None
     assert [(c.kind, c.label) for c in interpretation.chips] == [
-        ('numeric_stat', 'MaxHP ≥ 5000'),
-        ('item_type', 'Armor'),
+        ('numeric_stat', 'MaxHP ≥ 5000'), ('item_type', 'Armor'),
     ]
-    numeric = interpretation.chips[0]
-    assert interpretation.query_without(numeric.id) == 'armor'
+    assert interpretation.query_without(interpretation.chips[0].id) == 'armor'
 
 
-def test_boolean_expression_removal_rebuilds_from_ast_not_raw_substrings(tmp_path: Path) -> None:
+def test_boolean_expression_removal_rebuilds_from_ast(tmp_path: Path) -> None:
     service = make_service(tmp_path)
     try:
         outcome = service.search('hp > 5000 and cr bow')
     finally:
         service.close()
-
     interpretation = outcome.interpretation
     assert interpretation is not None
     hp_chip = next(c for c in interpretation.chips if c.label == 'MaxHP > 5000')
     cr_chip = next(c for c in interpretation.chips if c.label == 'Critical Rate')
     assert interpretation.query_without(hp_chip.id) == 'critical rate bow'
     assert interpretation.query_without(cr_chip.id) == 'maxhp > 5000 bow'
+
+
+def test_or_expression_removal_drops_empty_or_group(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    try:
+        outcome = service.search('hp > 5000 or cr bow')
+    finally:
+        service.close()
+    interpretation = outcome.interpretation
+    assert interpretation is not None
+    hp_chip = next(c for c in interpretation.chips if c.label == 'MaxHP > 5000')
+    assert interpretation.query_without(hp_chip.id) == 'critical rate bow'
 
 
 def test_unsafe_item_suggestion_has_no_interpretation(tmp_path: Path) -> None:
@@ -322,25 +303,17 @@ def test_exact_and_fuzzy_item_routes_have_quality_but_no_chips(tmp_path: Path) -
     assert fuzzy.interpretation is None
 ```
 
-- [ ] **Step 2: Run the targeted tests and confirm RED**
-
-Run:
+- [ ] **Step 2: Confirm RED**
 
 ```bash
-python -m pytest \
-  tests/test_item_search.py::test_item_interpretation_for_aggro_weapon_crysta_is_canonical_and_removable \
-  tests/test_item_search.py::test_rank_chip_depends_on_stat_and_reconstructs_canonically \
-  tests/test_item_search.py::test_numeric_comparison_is_one_atomic_chip \
-  tests/test_item_search.py::test_boolean_expression_removal_rebuilds_from_ast_not_raw_substrings \
-  tests/test_item_search.py::test_unsafe_item_suggestion_has_no_interpretation \
-  tests/test_item_search.py::test_exact_and_fuzzy_item_routes_have_quality_but_no_chips -q
+python -m pytest tests/test_item_search.py -q
 ```
 
-Expected: failures because outcomes do not yet expose `interpretation` or `route_quality`.
+Expected: new tests fail because interpretation/quality fields do not exist.
 
-- [ ] **Step 3: Give item-type filters a canonical query form**
+- [ ] **Step 3: Add canonical item-type metadata**
 
-Modify `ItemTypeFilter` in `toram_search/items/filters.py`:
+Modify `toram_search/items/filters.py`:
 
 ```python
 @dataclass(frozen=True)
@@ -349,11 +322,8 @@ class ItemTypeFilter:
     item_types: tuple[str, ...]
     consumed_text: str
     canonical_text: str
-```
 
-Extend candidate construction so aliases share one canonical representation. Use these exact canonical group fragments:
 
-```python
 _CANONICAL_SPECIAL = {
     'Weapon Crysta': 'weapon xtal',
     'Armor Crysta': 'armor xtal',
@@ -364,11 +334,18 @@ _CANONICAL_SPECIAL = {
 }
 ```
 
-For ordinary item types use `normalize_stat_text(actual_item_type)` as `canonical_text`. `extract_item_filter()` must still match the exact same aliases and item-type sets; only the returned metadata changes.
+Keep `_candidates()` matching behavior unchanged. In `extract_item_filter()`, replace the 3-field construction with:
 
-- [ ] **Step 4: Add item outcome metadata with backward-compatible defaults**
+```python
+canonical = _CANONICAL_SPECIAL.get(label, normalize_stat_text(label))
+return ItemTypeFilter(label, types, phrase, canonical), ' '.join(remaining)
+```
 
-Modify `toram_search/items/models.py` imports and `ItemSearchOutcome`:
+This turns every alias that resolves to `Weapon Crysta` into canonical `weapon xtal` without changing which rows are searched.
+
+- [ ] **Step 4: Extend `ItemSearchOutcome`**
+
+Add imports and fields in `toram_search/items/models.py`:
 
 ```python
 from toram_search.interpretation import QueryInterpretation, RouteQuality
@@ -386,15 +363,20 @@ class ItemSearchOutcome:
     route_quality: RouteQuality = RouteQuality()
 ```
 
-Do not remove or repurpose `routing_confidence`.
+- [ ] **Step 5: Implement `toram_search/items/interpretation.py`**
 
-- [ ] **Step 5: Implement item semantic reconstruction helpers**
-
-Create `toram_search/items/interpretation.py` with focused helpers. The implementation must canonicalize values semantically, not by deleting text from the original query.
-
-Use these formatting rules:
+Create the file with these helpers and bodies:
 
 ```python
+from __future__ import annotations
+
+from typing import cast
+
+from toram_search.interpretation import QueryChip, QueryInterpretation
+from .aliases import normalize_stat_text
+from .filters import ItemTypeFilter
+from .models import ParsedClause, ParsedStatExpression
+
 _PREFERRED_STAT_QUERY = {
     'Aggro %': 'aggro',
     'Critical Rate': 'critical rate',
@@ -411,82 +393,193 @@ def _stat_fragment(stat_name: str) -> str:
     return _PREFERRED_STAT_QUERY.get(stat_name, normalize_stat_text(stat_name))
 
 
-def _comparison_label(stat_name: str, operator: str, value: float) -> str:
-    symbol = {'>=': '≥', '<=': '≤', '==': '=', '=': '='}.get(operator, operator)
-    return f'{stat_name} {symbol} {_number(value)}'
+def _join(parts: list[str]) -> str:
+    return ' '.join(part for part in parts if part).strip()
+
+
+def _clause_fragment(clause: ParsedClause) -> str:
+    stat = _stat_fragment(clause.typed_stat)
+    if clause.explicit_comparison:
+        return f'{stat} {clause.operator} {_number(clause.value)}'
+    return stat
+
+
+def _clause_label(clause: ParsedClause) -> str:
+    if not clause.explicit_comparison:
+        return clause.typed_stat
+    symbol = {'>=': '≥', '<=': '≤', '==': '=', '=': '='}.get(clause.operator, clause.operator)
+    return f'{clause.typed_stat} {symbol} {_number(clause.value)}'
+
+
+def build_simple_item_interpretation(
+    stat: str,
+    item_filter: ItemTypeFilter | None,
+    rank_direction: str | None,
+    negative_stat: bool,
+) -> QueryInterpretation:
+    stat_kind = 'numeric_stat' if negative_stat else 'stat'
+    stat_label = f'{stat} ≤ -1' if negative_stat else stat
+    stat_fragment = f'{_stat_fragment(stat)} <= -1' if negative_stat else _stat_fragment(stat)
+    semantic = []
+    if rank_direction is not None:
+        semantic.append(('rank', 'rank', 'Lowest' if rank_direction == 'asc' else 'Highest', 'lowest' if rank_direction == 'asc' else 'highest'))
+    semantic.append(('stat', stat_kind, stat_label, stat_fragment))
+    if item_filter is not None:
+        semantic.append(('item_type', 'item_type', item_filter.label, item_filter.canonical_text))
+
+    def rebuild_without(chip_id: str) -> str:
+        removed = {chip_id}
+        if chip_id == 'stat':
+            removed.add('rank')
+        return _join([fragment for part_id, _kind, _label, fragment in semantic if part_id not in removed])
+
+    chips = tuple(
+        QueryChip(
+            part_id,
+            kind,
+            label,
+            fragment,
+            rebuild_without(part_id),
+            ('stat',) if part_id == 'rank' else (),
+        )
+        for part_id, kind, label, fragment in semantic
+    )
+    return QueryInterpretation('Items', _join([row[3] for row in semantic]), chips)
+
+
+def _rebuild_expression(
+    expr: ParsedStatExpression,
+    removed_clause: tuple[int, int] | None,
+    remove_filter: bool,
+) -> str:
+    groups = []
+    for group_index, group in enumerate(expr.groups):
+        clauses = []
+        for clause_index, clause in enumerate(group.clauses):
+            if removed_clause == (group_index, clause_index):
+                continue
+            clauses.append(_clause_fragment(clause))
+        if clauses:
+            groups.append(' and '.join(clauses))
+    expression = ' or '.join(groups)
+    item_filter = None if remove_filter else cast(ItemTypeFilter | None, expr.item_filter)
+    return _join([expression, item_filter.canonical_text if item_filter is not None else ''])
+
+
+def build_expression_item_interpretation(expr: ParsedStatExpression) -> QueryInterpretation:
+    chips = []
+    for group_index, group in enumerate(expr.groups):
+        for clause_index, clause in enumerate(group.clauses):
+            chip_id = f'clause_{group_index}_{clause_index}'
+            chips.append(QueryChip(
+                chip_id,
+                'numeric_stat' if clause.explicit_comparison else 'stat',
+                _clause_label(clause),
+                _clause_fragment(clause),
+                _rebuild_expression(expr, (group_index, clause_index), False),
+            ))
+    item_filter = cast(ItemTypeFilter | None, expr.item_filter)
+    if item_filter is not None:
+        chips.append(QueryChip(
+            'item_type',
+            'item_type',
+            item_filter.label,
+            item_filter.canonical_text,
+            _rebuild_expression(expr, None, True),
+        ))
+    return QueryInterpretation('Items', _rebuild_expression(expr, None, False), tuple(chips))
 ```
 
-`build_simple_item_interpretation()` must accept the already-resolved `stat`, `item_filter`, `rank_direction`, and `negative_stat` values from `ItemSearchService.search()` and build these exact semantic parts:
+The helper reconstructs AND/OR from the parsed AST, so removing a clause can never leave a dangling boolean operator.
 
-- rank: `Highest` / canonical `highest`, or `Lowest` / canonical `lowest`;
-- normal stat: kind `stat`, database label, canonical `_stat_fragment(stat)`;
-- negative shorthand: kind `numeric_stat`, label `<Stat> ≤ -1`, canonical `<stat fragment> <= -1` so reconstruction remains equivalent without depending on the `-alias` shorthand;
-- item type: kind `item_type`, label `item_filter.label`, canonical `item_filter.canonical_text`.
+- [ ] **Step 6: Attach item metadata from the existing search branches**
 
-Rank depends on the stat chip. Precompute every chip's `query_without` from the remaining semantic parts. If the stat is removed, omit rank automatically. For the approved examples this must yield exactly:
+In `ItemSearchService.search()`, after computing `raw`, define a local outcome factory so every branch assigns quality consistently:
+
+```python
+def finish(
+    kind,
+    results=(),
+    message=None,
+    suggested_queries=(),
+    routing_confidence='none',
+    family='none',
+    specificity=0,
+    interpretation=None,
+):
+    return ItemSearchOutcome(
+        kind,
+        raw,
+        results,
+        message,
+        suggested_queries,
+        routing_confidence,
+        interpretation,
+        RouteQuality(family, bool(results), specificity),
+    )
+```
+
+Import `RouteQuality`, `build_simple_item_interpretation`, and `build_expression_item_interpretation`. Convert the existing return sites to `finish()` without changing their result/message values. Apply this exact metadata mapping:
 
 ```text
-aggro xtal wp        -> remove type -> aggro
-aggro xtal wp        -> remove stat -> weapon xtal
-highest cr bow       -> remove rank -> critical rate bow
-highest cr bow       -> remove stat -> bow
-highest cr bow       -> remove type -> highest critical rate
+empty/unrecognized                      family=none, specificity=0
+exact item name                         family=exact, specificity=1
+exact upgrade target                    family=exact, specificity=1
+fuzzy upgrade target                    family=structured, specificity=1
+help/meta/refuse                        family=structured, specificity=0, interpretation=None
+clarify/suggest/unsafe structured parse family=structured, specificity=max(1, recognized constraints), interpretation=None
+fuzzy item-name fallback                family=weak, specificity=0, interpretation=None
 ```
 
-For parsed boolean expressions, `build_expression_item_interpretation(expr)` must walk `ParsedStatExpression.groups` directly. Generate one chip per clause, using `numeric_stat` for explicit comparisons and `stat` for implicit clauses. Rebuild a removed clause by:
+For the simple stat branch, after sorting/grouping rows:
 
-1. removing the clause from its AND group;
-2. dropping an empty group;
-3. joining remaining clauses in a group with ` and `;
-4. joining remaining groups with ` or `;
-5. appending `expr.item_filter.canonical_text` if present;
-6. returning only the item filter if all clauses were removed;
-7. returning the expression alone when the item-type chip is removed.
-
-This preserves valid syntax for `AND/OR` queries and avoids raw substring edits.
-
-- [ ] **Step 6: Attach interpretation and route quality inside the existing item search branches**
-
-Modify `ItemSearchService.search()` so the current parsing variables remain the source of truth.
-
-Assign route families as follows without changing result behavior:
-
-```text
-exact item name                         -> exact
-exact upgrade target                    -> exact
-fuzzy upgrade target                    -> structured
-help/meta/refuse                        -> structured, no interpretation
-clarify/suggest/unsafe structured parse -> structured, no interpretation
-simple stat/filter/rank                 -> structured + simple interpretation
-parsed numeric/AND/OR expression        -> structured + expression interpretation
-recognized structured no-result         -> structured, no interpretation if parse was unsafe
-fuzzy item-name fallback                -> weak
-fully unrecognized                      -> none
+```python
+interpretation = build_simple_item_interpretation(stat, item_filter, rank_direction, negative_stat)
+specificity = 1 + int(item_filter is not None) + int(rank_direction is not None)
+return finish(
+    'results' if cards else 'not_found',
+    cards,
+    None if cards else 'No matching items found.',
+    routing_confidence='strong',
+    family='structured',
+    specificity=specificity,
+    interpretation=interpretation,
+)
 ```
 
-Set `RouteQuality.has_results` from the actual returned cards. For structured routes set `specificity` to the number of semantic constraints actually executed, not result count. Count rank, stat/expression clauses, and item type separately. For exact routes use specificity `1`. For weak/none use specificity `0`.
+For the parsed expression branch, after unknown-stat validation:
 
-Do not change the existing strong/weak/none `routing_confidence` assignments used by Universal weak-skill suppression.
+```python
+rows = self.repository.search_expression(expr)
+cards = tuple(ItemCardResult(i, m) for i, m, _score in rows)
+clause_count = sum(len(group.clauses) for group in expr.groups)
+specificity = clause_count + int(expr.item_filter is not None)
+return finish(
+    'results' if cards else 'not_found',
+    cards,
+    None if cards else 'No matching items found.',
+    routing_confidence='strong',
+    family='structured',
+    specificity=specificity,
+    interpretation=build_expression_item_interpretation(expr),
+)
+```
 
-- [ ] **Step 7: Run item tests and fix only item-scope regressions**
+Do not change existing `routing_confidence`; Universal weak-skill suppression still uses it.
 
-Run:
+- [ ] **Step 7: Confirm item GREEN**
 
 ```bash
 python -m pytest tests/test_item_search.py -q
 ```
 
-Expected: all item tests pass, including duplicate-stat grouping and structured-routing regressions.
+Expected: all old and new item tests pass, including duplicate-stat grouping and `aggro xtal wp` routing.
 
-- [ ] **Step 8: Commit Task 2**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add \
-  toram_search/items/interpretation.py \
-  toram_search/items/filters.py \
-  toram_search/items/models.py \
-  toram_search/items/service.py \
-  tests/test_item_search.py
+git add toram_search/items/interpretation.py toram_search/items/filters.py \
+  toram_search/items/models.py toram_search/items/service.py tests/test_item_search.py
 git commit -m "feat: expose item query interpretations"
 ```
 
@@ -501,17 +594,16 @@ git commit -m "feat: expose item query interpretations"
 - Modify: `tests/test_skill_search.py`
 
 **Interfaces:**
-- Consumes: shared interpretation types from Task 1 and existing `SkillFilter` values from `SkillSearchService`.
-- Produces: `build_skill_interpretation(...) -> QueryInterpretation | None`.
-- `SkillSearchOutcome` gains `interpretation` and `route_quality` metadata.
-- No new independent skill parser is allowed; helpers receive values already resolved by the service.
+- `build_skill_interpretation(tree_name: str | None, ailment: str | None, mp_cost_max: int | None, required_level_max: int | None, mp_rank_direction: str | None, count_mode: bool, unsupported_structured_component: bool) -> QueryInterpretation | None`.
+- The helper receives only values already resolved by `SkillSearchService`; it does not parse raw text.
+- `SkillSearchOutcome` gains `interpretation` and `route_quality` fields after existing fields.
 
-- [ ] **Step 1: Add failing skill interpretation tests**
+- [ ] **Step 1: Add failing skill tests**
 
 Append to `tests/test_skill_search.py`:
 
 ```python
-def test_skill_tree_query_exposes_removable_tree_chip(tmp_path: Path) -> None:
+def test_skill_tree_query_exposes_tree_chip(tmp_path: Path) -> None:
     service = make_service(tmp_path)
     try:
         outcome = service.search('shield skill tree')
@@ -529,9 +621,8 @@ def test_ailment_query_exposes_ailment_chip(tmp_path: Path) -> None:
         outcome = service.search('skills that inflict stun')
     finally:
         service.close()
-    interpretation = outcome.interpretation
-    assert interpretation is not None
-    assert [(c.kind, c.label) for c in interpretation.chips] == [('ailment', 'Stun')]
+    assert outcome.interpretation is not None
+    assert [(c.kind, c.label) for c in outcome.interpretation.chips] == [('ailment', 'Stun')]
 
 
 def test_mp_and_required_level_filters_are_atomic(tmp_path: Path) -> None:
@@ -544,9 +635,7 @@ def test_mp_and_required_level_filters_are_atomic(tmp_path: Path) -> None:
     assert mp.interpretation is not None
     assert [(c.kind, c.label) for c in mp.interpretation.chips] == [('mp', 'MP ≤ 200')]
     assert level.interpretation is not None
-    assert [(c.kind, c.label) for c in level.interpretation.chips] == [
-        ('required_level', 'Required Level ≤ 20')
-    ]
+    assert [(c.kind, c.label) for c in level.interpretation.chips] == [('required_level', 'Required Level ≤ 20')]
 
 
 def test_lowest_mp_tree_ranking_uses_atomic_rank_field_chip(tmp_path: Path) -> None:
@@ -558,16 +647,13 @@ def test_lowest_mp_tree_ranking_uses_atomic_rank_field_chip(tmp_path: Path) -> N
     interpretation = outcome.interpretation
     assert interpretation is not None
     assert [(c.kind, c.label) for c in interpretation.chips] == [
-        ('rank', 'Lowest MP'),
-        ('skill_tree', 'Shield Skills'),
+        ('rank', 'Lowest MP'), ('skill_tree', 'Shield Skills'),
     ]
-    rank = interpretation.chips[0]
-    tree = interpretation.chips[1]
-    assert interpretation.query_without(rank.id) == 'shield skills'
-    assert interpretation.query_without(tree.id) == 'lowest mp'
+    assert interpretation.query_without(interpretation.chips[0].id) == 'shield skills'
+    assert interpretation.query_without(interpretation.chips[1].id) == 'lowest mp'
 
 
-def test_exact_skill_route_wins_quality_without_renderable_chips(tmp_path: Path) -> None:
+def test_exact_skill_has_quality_but_no_chips(tmp_path: Path) -> None:
     service = make_service(tmp_path)
     try:
         outcome = service.search('Guardian')
@@ -600,24 +686,15 @@ def test_weak_skill_fallback_has_no_interpretation(tmp_path: Path) -> None:
     assert outcome.interpretation is None
 ```
 
-- [ ] **Step 2: Run targeted skill tests and confirm RED**
-
-Run:
+- [ ] **Step 2: Confirm RED**
 
 ```bash
-python -m pytest \
-  tests/test_skill_search.py::test_skill_tree_query_exposes_removable_tree_chip \
-  tests/test_skill_search.py::test_ailment_query_exposes_ailment_chip \
-  tests/test_skill_search.py::test_mp_and_required_level_filters_are_atomic \
-  tests/test_skill_search.py::test_lowest_mp_tree_ranking_uses_atomic_rank_field_chip \
-  tests/test_skill_search.py::test_exact_skill_route_wins_quality_without_renderable_chips \
-  tests/test_skill_search.py::test_unsupported_structured_skill_components_do_not_emit_partial_chips \
-  tests/test_skill_search.py::test_weak_skill_fallback_has_no_interpretation -q
+python -m pytest tests/test_skill_search.py -q
 ```
 
-Expected: failures because `SkillSearchOutcome` has no interpretation/quality metadata.
+Expected: new metadata assertions fail.
 
-- [ ] **Step 3: Extend `SkillSearchOutcome` with shared metadata**
+- [ ] **Step 3: Extend `SkillSearchOutcome`**
 
 Modify `toram_search/skills/models.py`:
 
@@ -636,11 +713,14 @@ class SkillSearchOutcome:
     route_quality: RouteQuality = RouteQuality()
 ```
 
-- [ ] **Step 4: Implement the supported skill interpretation builder**
-
-Create `toram_search/skills/interpretation.py` with a single focused builder that receives canonical values already resolved by `SkillSearchService`:
+- [ ] **Step 4: Implement `toram_search/skills/interpretation.py` exactly**
 
 ```python
+from __future__ import annotations
+
+from toram_search.interpretation import QueryChip, QueryInterpretation
+
+
 def build_skill_interpretation(
     *,
     tree_name: str | None = None,
@@ -651,54 +731,143 @@ def build_skill_interpretation(
     count_mode: bool = False,
     unsupported_structured_component: bool = False,
 ) -> QueryInterpretation | None:
-    ...
+    if unsupported_structured_component:
+        return None
+
+    semantic = []
+    if mp_rank_direction is not None:
+        descending = mp_rank_direction == 'desc'
+        semantic.append((
+            'rank_mp', 'rank', 'Highest MP' if descending else 'Lowest MP',
+            'highest mp' if descending else 'lowest mp',
+        ))
+    if ailment is not None:
+        semantic.append(('ailment', 'ailment', ailment, f'inflict {ailment.casefold()}'))
+    if mp_cost_max is not None:
+        semantic.append(('mp', 'mp', f'MP ≤ {mp_cost_max}', f'mp <= {mp_cost_max}'))
+    if required_level_max is not None:
+        semantic.append((
+            'required_level', 'required_level',
+            f'Required Level ≤ {required_level_max}',
+            f'required level <= {required_level_max}',
+        ))
+    if tree_name is not None:
+        semantic.append(('skill_tree', 'skill_tree', tree_name, tree_name.casefold()))
+    if not semantic:
+        return None
+
+    def canonical(fragments: list[str]) -> str:
+        if not fragments:
+            return ''
+        body = ' '.join(fragments)
+        return f'how many skills {body}' if count_mode else body
+
+    chips = tuple(
+        QueryChip(
+            part_id,
+            kind,
+            label,
+            fragment,
+            canonical([row[3] for row in semantic if row[0] != part_id]),
+        )
+        for part_id, kind, label, fragment in semantic
+    )
+    return QueryInterpretation('Skills', canonical([row[3] for row in semantic]), chips)
 ```
 
-Rules:
+`Lowest MP` / `Highest MP` is atomic because bare MP is not a filter in the existing tree-ranking route. This avoids a chip that would claim a filter the parser did not execute.
 
-- If `unsupported_structured_component` is true, return `None` even when a supported tree is also present. This prevents partial explanations for `tier 1 shield skills` and `active shield skills`.
-- Tree chip: kind `skill_tree`, label canonical DB tree name such as `Shield Skills`, fragment `shield skills`.
-- Ailment chip: kind `ailment`, label canonical ailment such as `Stun`, fragment `inflict stun`.
-- MP max chip: kind `mp`, label `MP ≤ 200`, fragment `mp <= 200`.
-- Required-level chip: kind `required_level`, label `Required Level ≤ 20`, fragment `required level <= 20`.
-- MP ranking is one atomic rank-field chip rather than a misleading standalone MP chip: kind `rank`, label `Lowest MP` or `Highest MP`, fragment `lowest mp` / `highest mp`.
-- Join remaining fragments with single spaces; these are token-independent patterns already supported by `_structured_filter_from_query()` and the existing tree/rank branches.
-- If `count_mode` is true, prefix a non-empty rebuilt query with `how many skills `; if removal leaves no filters, return the empty string rather than invalid `how many skills`.
-- Precompute `query_without` for each chip. No UI code may reconstruct these strings itself.
+- [ ] **Step 5: Attach skill metadata from the existing search branches**
 
-- [ ] **Step 5: Integrate the builder into existing skill search branches**
+In `SkillSearchService.search()`, define a local factory after `raw`/`norm`:
 
-Modify `SkillSearchService.search()` without introducing a second parsing pass.
+```python
+def finish(
+    kind,
+    results=(),
+    message=None,
+    suggested_queries=(),
+    family='none',
+    specificity=0,
+    interpretation=None,
+):
+    return SkillSearchOutcome(
+        kind,
+        raw,
+        results,
+        message,
+        suggested_queries,
+        interpretation,
+        RouteQuality(family, bool(results), specificity),
+    )
+```
 
-Use already-computed values:
-- `skills` from `_find_skill_phrases()` for exact/compare/property routes;
-- `structured_filter` from `_structured_filter_from_query()`;
-- resolved tree IDs/names from `_tree_id_from_query()` / repository;
-- resolved ailment names from `resolve_ailment()`;
-- existing MP ranking direction logic.
-
-Assign quality families:
+Convert current return sites to `finish()` without changing results/messages. Apply:
 
 ```text
-exact skill name / exact skill property / compare -> exact, no interpretation
-explicit supported structured filters            -> structured + interpretation
-supported tree-only route                        -> structured + tree interpretation
-supported ailment route                          -> structured + ailment interpretation
-lowest/highest MP route                          -> structured + atomic MP-rank interpretation
-structured route with tier/skill type/weapons    -> structured, interpretation None
-strict no-match before weak fallback              -> none
-RapidFuzz / lexical fallback                     -> weak, interpretation None
-fully no-match                                   -> none
-refuse                                           -> structured, interpretation None
+exact skill / exact property / compare -> family=exact, interpretation=None
+refuse                               -> family=structured, interpretation=None
+RapidFuzz / lexical fallback        -> family=weak, interpretation=None
+strict no-match / final no-match    -> family=none, interpretation=None
 ```
 
-Set structured `specificity` from the number of executed constraints, including unsupported ones. For example `tier 1 shield skills` has specificity 2 even though interpretation is omitted. Exact skill routes use specificity 1 (or 2 for compare). Weak/none use 0.
+For `structured_filter`, derive only from its existing values:
 
-Do not change `allow_weak_fallback` semantics.
+```python
+unsupported = bool(
+    structured_filter.tiers
+    or structured_filter.skill_types
+    or structured_filter.weapons
+)
+tree_name = None
+if structured_filter.tree_ids:
+    tree_name = self.repository.get_tree(structured_filter.tree_ids[0]).name
+interpretation = build_skill_interpretation(
+    tree_name=tree_name,
+    ailment=structured_filter.ailments[0] if structured_filter.ailments else None,
+    mp_cost_max=structured_filter.mp_cost_max,
+    required_level_max=structured_filter.required_level_max,
+    count_mode=norm.startswith('how many'),
+    unsupported_structured_component=unsupported,
+)
+specificity = (
+    len(structured_filter.tree_ids)
+    + len(structured_filter.tiers)
+    + len(structured_filter.skill_types)
+    + len(structured_filter.ailments)
+    + len(structured_filter.weapons)
+    + int(structured_filter.mp_cost_max is not None)
+    + int(structured_filter.required_level_max is not None)
+)
+```
 
-- [ ] **Step 6: Run all skill tests and confirm GREEN**
+Use that `interpretation` and `specificity` in the existing explicit-filter result/count return.
 
-Run:
+For the existing tree branch, use:
+
+```python
+if 'mp' in norm and any(x in norm for x in ('lowest', 'least', 'highest')):
+    direction = 'desc' if 'highest' in norm else 'asc'
+    rows = self.analytics.rank('mp_cost_value', direction, filters=SkillFilter(tree_ids=(tree.id,)), limit=20)
+    interpretation = build_skill_interpretation(tree_name=tree.name, mp_rank_direction=direction)
+    return finish('results', self._cards(rows, 'mp_cost_value'), family='structured', specificity=2, interpretation=interpretation)
+
+rows = self.repository.list_skills_in_tree(tree.id)
+return finish(
+    'results' if rows else 'not_found',
+    self._cards(rows),
+    None if rows else 'No matching skills found.',
+    family='structured',
+    specificity=1,
+    interpretation=build_skill_interpretation(tree_name=tree.name),
+)
+```
+
+For the existing ailment fallback branch, pass `ailment=canonical`, family `structured`, specificity `1`. For the global MP ranking branch, pass `mp_rank_direction=direction`, family `structured`, specificity `1`.
+
+Do not change `allow_weak_fallback` behavior.
+
+- [ ] **Step 6: Confirm skill GREEN**
 
 ```bash
 python -m pytest tests/test_skill_search.py -q
@@ -706,14 +875,11 @@ python -m pytest tests/test_skill_search.py -q
 
 Expected: all current and new skill tests pass.
 
-- [ ] **Step 7: Commit Task 3**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add \
-  toram_search/skills/interpretation.py \
-  toram_search/skills/models.py \
-  toram_search/skills/service.py \
-  tests/test_skill_search.py
+git add toram_search/skills/interpretation.py toram_search/skills/models.py \
+  toram_search/skills/service.py tests/test_skill_search.py
 git commit -m "feat: expose skill query interpretations"
 ```
 
@@ -727,13 +893,13 @@ git commit -m "feat: expose skill query interpretations"
 - Modify: `tests/test_universal.py`
 
 **Interfaces:**
-- Consumes: `ItemSearchOutcome.route_quality`, `SkillSearchOutcome.route_quality`, and optional interpretations.
-- Produces: `UniversalSearchOutcome.interpretation: QueryInterpretation | None`.
-- Search execution order and item-driven `allow_weak_fallback` remain unchanged.
+- `UniversalSearchOutcome` gains `interpretation: QueryInterpretation | None`.
+- `select_winning_interpretation(items: ItemSearchOutcome | None, skills: SkillSearchOutcome | None) -> QueryInterpretation | None` selects by quality only.
+- Existing item-first execution and item `routing_confidence` weak-skill suppression remain unchanged.
 
-- [ ] **Step 1: Add failing Universal selection tests**
+- [ ] **Step 1: Add failing Universal tests**
 
-Add imports and tests to `tests/test_universal.py`:
+Add to `tests/test_universal.py`:
 
 ```python
 from toram_search.interpretation import QueryChip, QueryInterpretation, RouteQuality
@@ -751,39 +917,20 @@ def _interp(domain: str, label: str) -> QueryInterpretation:
     )
 
 
-def test_exact_route_beats_structured_route_even_when_exact_has_no_chips() -> None:
+def test_exact_winner_with_no_chips_does_not_fall_back_to_other_domain() -> None:
     item = ItemSearchOutcome(
-        'results',
-        'shared',
+        'results', 'shared',
         route_quality=RouteQuality('structured', True, 3),
         interpretation=_interp('Items', 'Critical Rate'),
     )
     skill = SkillSearchOutcome(
-        'results',
-        'shared',
+        'results', 'shared',
         route_quality=RouteQuality('exact', True, 1),
-        interpretation=None,
     )
     assert select_winning_interpretation(item, skill) is None
 
 
 def test_more_specific_structured_route_wins_same_family_tie() -> None:
-    item_interp = _interp('Items', 'Critical Rate')
-    skill_interp = _interp('Skills', 'Stun')
-    item = ItemSearchOutcome(
-        'results', 'shared',
-        route_quality=RouteQuality('structured', True, 1),
-        interpretation=item_interp,
-    )
-    skill = SkillSearchOutcome(
-        'results', 'shared',
-        route_quality=RouteQuality('structured', True, 2),
-        interpretation=skill_interp,
-    )
-    assert select_winning_interpretation(item, skill) == skill_interp
-
-
-def test_result_count_is_not_part_of_interpretation_winner_key() -> None:
     item_interp = _interp('Items', 'Critical Rate')
     skill_interp = _interp('Skills', 'Stun')
     item = ItemSearchOutcome(
@@ -813,11 +960,8 @@ def test_equal_quality_uses_stable_items_first_tie_break() -> None:
         interpretation=skill_interp,
     )
     assert select_winning_interpretation(item, skill) == item_interp
-```
 
-Also extend existing end-to-end mode tests:
 
-```python
 def test_items_mode_exposes_item_interpretation(tmp_path: Path) -> None:
     items = tmp_path / 'items.sqlite'
     create_item_database(items)
@@ -842,17 +986,17 @@ def test_skills_mode_exposes_skill_interpretation(tmp_path: Path) -> None:
     assert outcome.interpretation.domain == 'Skills'
 ```
 
-- [ ] **Step 2: Run the Universal tests and confirm RED**
+Raw result count is deliberately absent from the selector's inputs and sort key; the tests fabricate outcomes with explicit route quality so adding more result cards cannot affect winner selection.
 
-Run:
+- [ ] **Step 2: Confirm RED**
 
 ```bash
 python -m pytest tests/test_universal.py -q
 ```
 
-Expected: failures because `UniversalSearchOutcome` has no interpretation field and `select_winning_interpretation()` does not exist.
+Expected: failures for missing top-level interpretation/selector.
 
-- [ ] **Step 3: Extend the top-level outcome model**
+- [ ] **Step 3: Extend the top-level outcome**
 
 Modify `toram_search/models.py`:
 
@@ -868,7 +1012,7 @@ class UniversalSearchOutcome:
     interpretation: QueryInterpretation | None = None
 ```
 
-- [ ] **Step 4: Implement one deterministic Universal selection helper**
+- [ ] **Step 4: Add the selector**
 
 Add to `toram_search/router.py`:
 
@@ -881,48 +1025,45 @@ def select_winning_interpretation(items, skills):
         candidates.append((skills.route_quality.sort_key, 0, skills.interpretation))
     if not candidates:
         return None
-    _quality, _stable_domain_order, interpretation = max(
-        candidates,
-        key=lambda row: (row[0], row[1]),
-    )
-    return interpretation
+    return max(candidates, key=lambda row: (row[0], row[1]))[2]
 ```
 
-The final integer is only a stable exact tie-break after route quality and specificity are equal; it does not inspect result count. Items wins only this final otherwise-identical tie because the existing Universal coordinator is item-first.
+The second tuple value is only the final stable tie-break after result tier, route family, and specificity are identical. It never depends on result count.
 
-- [ ] **Step 5: Attach selection to all modes without changing search execution**
+- [ ] **Step 5: Wire the selector into all database modes**
 
-For `Universal`:
+Replace the current return construction with the same search calls plus interpretation metadata:
 
 ```python
-items = _search_items(...)
-skills = _search_skills(
-    ...,
-    allow_weak_fallback=items.routing_confidence != 'strong',
-)
-return UniversalSearchOutcome(
-    query=query,
-    items=items,
-    skills=skills,
-    interpretation=select_winning_interpretation(items, skills),
-)
+if mode == 'Universal':
+    items = _search_items(query, items_path)
+    skills = _search_skills(
+        query,
+        skills_path,
+        allow_weak_fallback=items.routing_confidence != 'strong',
+    )
+    return UniversalSearchOutcome(
+        query=query,
+        items=items,
+        skills=skills,
+        interpretation=select_winning_interpretation(items, skills),
+    )
+if mode == 'Items':
+    items = _search_items(query, items_path)
+    return UniversalSearchOutcome(query=query, items=items, interpretation=items.interpretation)
+skills = _search_skills(query, skills_path)
+return UniversalSearchOutcome(query=query, skills=skills, interpretation=skills.interpretation)
 ```
 
-For Items-only and Skills-only, copy that domain's own `interpretation` directly into `UniversalSearchOutcome.interpretation`.
-
-Do not alter the current strict skill fallback decision.
-
-- [ ] **Step 6: Run Universal tests and confirm GREEN**
-
-Run:
+- [ ] **Step 6: Confirm Universal GREEN**
 
 ```bash
 python -m pytest tests/test_universal.py -q
 ```
 
-Expected: all tests pass, including existing `aggro xtal wp`, exact skill, and weak FTS preservation regressions.
+Expected: all tests pass, including existing `aggro xtal wp`, exact skill, and weak FTS regressions.
 
-- [ ] **Step 7: Commit Task 4**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add toram_search/models.py toram_search/router.py tests/test_universal.py
@@ -938,15 +1079,13 @@ git commit -m "feat: select universal query interpretation"
 - Modify: `main.py`
 - Modify: `tests/test_app_shell.py`
 - Modify: `tests/test_ui_contract.py`
-- Verify unchanged: `components/autocomplete_search/index.html`
 - Verify unchanged behavior: `tests/test_search_component.py`
 
 **Interfaces:**
-- Consumes: `UniversalSearchOutcome.interpretation` and `QueryInterpretation.query_without()`.
-- Produces: `render_query_interpretation(interpretation: QueryInterpretation | None) -> str | None`.
-- Return value is a fill-only canonical query or `None` when no chip was removed.
+- `render_query_interpretation(interpretation: QueryInterpretation | None) -> str | None` returns a precomputed fill-only query or `None`.
+- `main.py` owns session-state clearing/reset; the renderer owns only presentation/click detection.
 
-- [ ] **Step 1: Add failing UI contract and AppTest coverage**
+- [ ] **Step 1: Add failing UI/AppTest coverage**
 
 Append to `tests/test_ui_contract.py`:
 
@@ -955,12 +1094,12 @@ def test_query_interpretation_renders_after_search_box_before_results() -> None:
     source = text('main.py')
     assert 'render_query_interpretation' in source
     assert source.index('submission=render_search_box') < source.index('render_query_interpretation')
-    assert source.index('render_query_interpretation') < source.index("st.divider()")
+    assert source.index('render_query_interpretation') < source.index('st.divider()')
 
 
 def test_chip_removal_clears_outcome_instead_of_submitting() -> None:
     source = text('main.py')
-    block = source[source.index('chip_fill='):source.index("st.divider()")]
+    block = source[source.index('chip_fill='):source.index('st.divider()')]
     assert 'st.session_state.last_outcome=None' in block
     assert 'query_to_run=chip_fill' not in block
     assert 'search_database(' not in block
@@ -979,8 +1118,8 @@ def test_chip_removal_fills_query_clears_results_and_does_not_submit() -> None:
         domain='Items',
         canonical_query='highest critical rate bow',
         chips=(
-            QueryChip('rank', 'rank', 'Highest', 'highest', 'critical rate bow'),
-            QueryChip('stat', 'stat', 'Critical Rate', 'critical rate', 'bow', depends_on=()),
+            QueryChip('rank', 'rank', 'Highest', 'highest', 'critical rate bow', ('stat',)),
+            QueryChip('stat', 'stat', 'Critical Rate', 'critical rate', 'bow'),
             QueryChip('item_type', 'item_type', 'Bow', 'bow', 'highest critical rate'),
         ),
     )
@@ -1005,22 +1144,17 @@ def test_chip_removal_fills_query_clears_results_and_does_not_submit() -> None:
     assert not any(button.label.endswith(' ×') for button in app.button)
 ```
 
-This AppTest checks the state transition. The existing `test_external_fill_syncs_when_streamlit_value_changes_even_if_input_keeps_focus()` in `tests/test_search_component.py` remains the contract proving that a changed `st.session_state.query` is propagated into the visible iframe input.
+The existing `tests/test_search_component.py::test_external_fill_syncs_when_streamlit_value_changes_even_if_input_keeps_focus` remains the visible-input synchronization regression.
 
-- [ ] **Step 2: Run the new UI tests and confirm RED**
-
-Run:
+- [ ] **Step 2: Confirm RED**
 
 ```bash
-python -m pytest \
-  tests/test_ui_contract.py::test_query_interpretation_renders_after_search_box_before_results \
-  tests/test_ui_contract.py::test_chip_removal_clears_outcome_instead_of_submitting \
-  tests/test_app_shell.py::test_chip_removal_fills_query_clears_results_and_does_not_submit -q
+python -m pytest tests/test_app_shell.py tests/test_ui_contract.py -q
 ```
 
-Expected: failures because the renderer and state transition do not exist.
+Expected: new renderer/state tests fail.
 
-- [ ] **Step 3: Implement the chip renderer**
+- [ ] **Step 3: Implement the renderer**
 
 Create `ui/interpretation.py`:
 
@@ -1048,17 +1182,15 @@ def render_query_interpretation(interpretation: QueryInterpretation | None) -> s
     return None
 ```
 
-Do not parse text, inspect result cards, or calculate dependencies here.
+- [ ] **Step 4: Integrate directly below the search box**
 
-- [ ] **Step 4: Integrate chips immediately below the search box**
-
-Import the renderer in `main.py`:
+Import:
 
 ```python
 from ui.interpretation import render_query_interpretation
 ```
 
-Keep search submission processing unchanged. After any submitted search has updated `st.session_state.last_outcome`, retrieve `outcome` and render the interpretation before the results divider:
+After the existing submit/`search_database()` block and before the existing results divider, use:
 
 ```python
 outcome: UniversalSearchOutcome | None = st.session_state.last_outcome
@@ -1069,29 +1201,19 @@ if chip_fill is not None:
     st.session_state.item_limit = 20
     st.session_state.skill_limit = 20
     st.rerun()
-
-if outcome is not None:
-    st.divider()
-    ...
 ```
 
-Do not assign `chip_fill` to `query_to_run`. Do not call `search_database()` from the chip-removal branch. Leave `last_submission_nonce` unchanged; the existing nonce guard prevents stale component submissions from rerunning the old query.
+Then leave the current `if outcome is not None:` result-rendering block unchanged. Do not assign `chip_fill` to `query_to_run`, do not call `search_database()` in this branch, and do not change `last_submission_nonce`.
 
-- [ ] **Step 5: Run UI/AppTest/search-component regressions**
-
-Run:
+- [ ] **Step 5: Confirm UI GREEN and fill-only regressions**
 
 ```bash
 python -m pytest tests/test_app_shell.py tests/test_ui_contract.py tests/test_search_component.py -q
 ```
 
-Expected: all tests pass. In particular:
-- example buttons remain fill-only;
-- correction buttons remain fill-only;
-- external value changes still sync into the custom input even if it keeps focus;
-- chip removal clears the old outcome and does not submit.
+Expected: all tests pass, including examples, corrections, and external iframe fill synchronization.
 
-- [ ] **Step 6: Commit Task 5**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add ui/interpretation.py main.py tests/test_app_shell.py tests/test_ui_contract.py
@@ -1100,20 +1222,18 @@ git commit -m "feat: add removable query interpretation chips"
 
 ---
 
-### Task 6: Real-database regressions, full verification, and scope audit
+### Task 6: Real-database regressions and final verification
 
 **Files:**
 - Modify: `tests/test_real_databases.py`
-- Verify: `items.sqlite`
-- Verify: `skills.sqlite`
+- Verify unchanged: `items.sqlite`, `skills.sqlite`
 
 **Interfaces:**
-- Consumes the complete feature from Tasks 1-5.
-- Produces real committed-database regression evidence and final branch verification.
+- Exercises the complete public `search_database()` path on committed databases.
 
-- [ ] **Step 1: Add real-database interpretation regressions**
+- [ ] **Step 1: Add real-database tests**
 
-Extend `tests/test_real_databases.py`:
+Append to `tests/test_real_databases.py`:
 
 ```python
 def test_real_aggro_weapon_crysta_query_exposes_item_interpretation() -> None:
@@ -1133,7 +1253,7 @@ def test_real_aggro_weapon_crysta_query_exposes_item_interpretation() -> None:
     assert outcome.interpretation.query_without(item_type.id) == 'aggro'
 
 
-def test_real_exact_guardian_does_not_fall_back_to_losing_item_chips() -> None:
+def test_real_exact_guardian_has_no_interpretation_chips() -> None:
     outcome = search_database(
         'Universal',
         'Guardian',
@@ -1145,66 +1265,47 @@ def test_real_exact_guardian_does_not_fall_back_to_losing_item_chips() -> None:
     assert outcome.interpretation is None
 ```
 
-The second test encodes the approved rule that the winning exact route can suppress chip display entirely rather than exposing another domain's interpretation.
-
 - [ ] **Step 2: Run real-database tests**
-
-Run:
 
 ```bash
 python -m pytest tests/test_real_databases.py -q
 ```
 
-Expected: all real-database tests pass, including the duplicate-item-ID regression and new interpretation assertions.
+Expected: all pass, including the duplicate-item-ID regression.
 
-- [ ] **Step 3: Run the full test suite**
-
-Run:
-
-```bash
-python -m pytest -q
-```
-
-Expected: all tests pass with no skips other than any environment-conditional real-database skip already present in the repository.
-
-- [ ] **Step 4: Compile all application Python sources**
-
-Run:
-
-```bash
-python -m compileall -q main.py toram_search ui
-```
-
-Expected: exit code 0 and no output.
-
-- [ ] **Step 5: Verify database files are untouched**
-
-Run:
-
-```bash
-git diff --exit-code "$(git merge-base HEAD origin/main)" -- items.sqlite skills.sqlite
-```
-
-Expected: exit code 0 and no diff.
-
-Also inspect the branch file list:
-
-```bash
-git diff --name-only "$(git merge-base HEAD origin/main)"..HEAD
-```
-
-Expected: only source, test, design, and plan files related to query interpretation chips; no unrelated refactors and no SQLite changes.
-
-- [ ] **Step 6: Commit the final real-database regression coverage**
+- [ ] **Step 3: Commit real-database coverage**
 
 ```bash
 git add tests/test_real_databases.py
 git commit -m "test: cover query interpretation on real databases"
 ```
 
-- [ ] **Step 7: Re-run final verification after the last commit**
+- [ ] **Step 4: Run the exact final test suite**
 
-Run again on the exact final branch head:
+```bash
+python -m pytest -q
+```
+
+Expected: full suite passes.
+
+- [ ] **Step 5: Compile application Python**
+
+```bash
+python -m compileall -q main.py toram_search ui
+```
+
+Expected: exit code 0, no output.
+
+- [ ] **Step 6: Verify database files and branch scope**
+
+```bash
+git diff --exit-code "$(git merge-base HEAD origin/main)" -- items.sqlite skills.sqlite
+git diff --name-only "$(git merge-base HEAD origin/main)"..HEAD
+```
+
+Expected: first command has no diff; second lists only query-interpretation source/tests/docs and no unrelated application files.
+
+- [ ] **Step 7: Fresh final verification after all commits**
 
 ```bash
 python -m pytest -q
@@ -1212,25 +1313,23 @@ python -m compileall -q main.py toram_search ui
 git diff --exit-code "$(git merge-base HEAD origin/main)" -- items.sqlite skills.sqlite
 ```
 
-Expected: full suite green, compileall green, and no database diff.
+Expected: tests green, compileall green, databases unchanged.
 
 ---
 
 ## Final Review Checklist
 
-Before declaring the branch ready for integration, verify all of the following against `docs/superpowers/specs/2026-08-14-query-interpretation-chips-design.md`:
-
-- Item stat/type/rank and numeric-comparison chips are produced from executed parser decisions.
-- `aggro xtal wp` reconstructs to `aggro` or `weapon xtal` as specified when the corresponding chip is removed.
-- `highest cr bow` removes dependent rank when the stat is removed.
-- `hp >= 5000 armor` uses one atomic numeric chip.
-- Boolean item expressions reconstruct from the parsed AST, including AND/OR collapse.
+- Item stat/type/rank and numeric-comparison chips come from executed parser decisions.
+- `aggro xtal wp` reconstructs to `aggro` or `weapon xtal` for the corresponding removal.
+- Removing `Critical Rate` from `highest cr bow` also removes dependent `Highest` and produces `bow`.
+- `hp >= 5000 armor` is one atomic numeric chip plus Armor.
+- Item AND/OR reconstruction uses `ParsedStatExpression`, not raw deletion.
 - Skill tree, ailment, MP max, required-level max, and MP ranking are covered.
-- Skill tier/skill-type/weapon structured routes do not emit misleading partial chips.
+- Tier/skill-type/weapon skill routes do not emit partial chips.
 - Exact/fuzzy/help/refusal/clarify/suggest routes do not render chips.
-- Universal winner selection uses route quality + specificity + stable final tie-break, never result count.
-- A winning exact route with no eligible chips yields no chips rather than falling back to the other domain.
-- Chip removal is fill-only, clears prior results/chips, resets limits, and does not change `last_submission_nonce`.
+- Universal selection uses route quality and specificity, never result count.
+- A winning route with no eligible chips yields no chips rather than using the losing domain.
+- Chip removal is fill-only, clears old results/chips, resets limits, and leaves submission nonce unchanged.
 - Existing example/correction fill-only behavior and iframe external-value synchronization still pass.
-- Existing structured Universal routing and duplicate-item-card fixes remain green.
-- No database file changes.
+- Existing Universal routing and duplicate-item-card fixes remain green.
+- `items.sqlite` and `skills.sqlite` are unchanged.
