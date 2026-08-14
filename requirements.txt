@@ -1,0 +1,2 @@
+streamlit>=1.61,<1.62
+rapidfuzz>=3,<4
