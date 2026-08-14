@@ -79,6 +79,7 @@ class ItemSearchService:
 
         looks_expression=bool(re.search(r"(>=|<=|==|>|<|=)|\b(and|or)\b",raw, re.I))
         stat, choices=self._resolve_stat(remaining_norm)
+        recognized_structured_intent=bool(item_filter is not None or rank_direction is not None or looks_expression or stat is not None or choices or stat_hits)
         if choices:
             return ItemSearchOutcome('clarify',raw,message='Choose a stat: '+', '.join(choices),suggested_queries=tuple(f'{c} {item_filter.consumed_text if item_filter else ""}'.strip() for c in choices),routing_confidence='strong')
         if stat and not looks_expression:
@@ -97,6 +98,8 @@ class ItemSearchService:
             if unknown:return ItemSearchOutcome('suggest',raw,message='Unknown stat: '+unknown[0],routing_confidence='strong')
             rows=self.repository.search_expression(expr)
             return ItemSearchOutcome('results' if rows else 'not_found',raw,tuple(ItemCardResult(i,m) for i,m,_ in rows),None if rows else 'No matching items found.',routing_confidence='strong')
+        if recognized_structured_intent:
+            return ItemSearchOutcome('suggest',raw,message=f'I could not safely parse "{raw}".',routing_confidence='strong')
         ranked=self.repository.fuzzy_items(raw)
         if ranked:return ItemSearchOutcome('results',raw,tuple(ItemCardResult(i,score=s,match_kind=k) for i,s,k in ranked),routing_confidence='weak')
         return ItemSearchOutcome('not_found',raw,message='No matching item or stat found.',routing_confidence='none')
