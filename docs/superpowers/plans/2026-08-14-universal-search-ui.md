@@ -4,7 +4,7 @@
 
 **Goal:** Finish the product by combining deterministic item and skill services behind the Universal / Items / Skills sidebar selector, replacing temporary native forms with a client-side autocomplete + Enter/Search submission component, and polishing the responsive Streamlit result/detail experience for deployment.
 
-**Architecture:** A frontend-neutral coordinator executes only the domain services allowed by the selected mode. Autocomplete indexes are built from read-only database vocabulary and cached as immutable data, then filtered entirely inside a small custom Streamlit HTML component restored from the repository's older working implementation. Typing never performs a database query; only Enter or the component Search button emits a submit event to Python. Session state stores the last submitted outcomes and independent show-more limits. Domain services remain unaware of Streamlit.
+**Architecture:** A frontend-neutral coordinator executes only the domain services allowed by the selected mode. Autocomplete vocabulary is also built per selected mode, so Items never requires a working skills database and Skills never requires a working items database. Suggestions are filtered entirely inside a small custom Streamlit HTML component restored from the repository's older working implementation. Typing never performs a database query; only Enter or the component Search button emits a submit event to Python. Session state stores the last submitted outcomes and independent show-more limits. No live SQLite connection is cached globally.
 
 **Tech Stack:** Python 3.12, Streamlit 1.61.x, Streamlit components API, browser JavaScript/HTML/CSS, SQLite, RapidFuzz, pytest/AppTest.
 
@@ -12,19 +12,21 @@
 
 - Target repository is only `KarenYuusha/toram-item-search`.
 - `KarenYuusha/filter_search` remains reference/source only.
-- Root `main.py` is the only public Streamlit entry point.
+- Root `main.py` is the public Streamlit entry point.
 - No LLM, embeddings, RAG, Ollama, Qwen, Gemma, Discord, or external search service.
 - Universal is the default sidebar mode.
-- Universal evaluates both deterministic domains and groups all applicable results by Items and Skills.
-- Items mode must not execute the skill search service; Skills mode must not execute the item search service.
+- Universal evaluates both deterministic domains and groups applicable results by Items and Skills.
+- Items mode must not open/search/validate the skill database as a requirement for use.
+- Skills mode must not open/search/validate the item database as a requirement for use.
+- Universal requires both databases to validate; it must not silently omit a broken domain.
 - Typing/autocomplete must not execute full database search.
 - Full search occurs only on Enter or Search button.
 - Suggestion click/Tab fills the input but does not submit automatically.
 - Initial result limit is 20 per domain; Items and Skills have independent Show more state.
 - Full item/skill records remain modal dialogs.
-- Do not cache live SQLite connections globally; cache only immutable vocabulary/index data. Open/close read-only services per submitted search/detail operation.
-- If a selected domain database is invalid, show the validation error. Universal must not silently omit a broken domain.
+- Cache immutable autocomplete data only; do not cache live SQLite connections/services.
 - Images/icons are best-effort; missing media must not break cards.
+- Version 1 deliberately omits a permanent/manual advanced-filter panel. Search syntax, examples, deterministic suggestions, and result-specific Show more are the v1 refinement surface. This preserves the approved search-first UX and avoids making users learn schema controls before searching.
 
 ---
 
@@ -59,31 +61,45 @@ tests/
 
 ## Historical Component Source
 
-Restore/adapt the known working component from target repository commit:
+Restore/adapt only these files from target repository commit `6560bc0c6bdaddf428feae1f00624b6c11cd1de3`:
 
 ```text
-6560bc0c6bdaddf428feae1f00624b6c11cd1de3
 components/autocomplete_search/index.html
 components/autocomplete_search/streamlit_bridge.js
 ```
 
-Do not restore the old CSV/pandas application. Only the component is reused.
+Do not restore the old CSV/pandas application or its old `main.py`.
 
-## Locked Integration Interfaces
+## Locked Integration Models
 
 Add to `toram_search/models.py`:
 
 ```python
-from dataclasses import dataclass
-from typing import Literal
+from __future__ import annotations
 
-SuggestionKind = Literal["Item", "Skill", "Skill Tree", "Stat", "Item Type", "Ailment"]
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from toram_search.items.models import ItemSearchOutcome
+    from toram_search.skills.models import SkillSearchOutcome
+
+SuggestionKind = Literal[
+    "Item",
+    "Skill",
+    "Skill Tree",
+    "Stat",
+    "Item Type",
+    "Ailment",
+]
+
 
 @dataclass(frozen=True)
 class AutocompleteSuggestion:
     value: str
     label: str
     kind: SuggestionKind
+
 
 @dataclass(frozen=True)
 class UniversalSearchOutcome:
@@ -92,49 +108,11 @@ class UniversalSearchOutcome:
     skills: SkillSearchOutcome | None = None
 ```
 
-```python
-# toram_search/autocomplete.py
-def build_autocomplete_index(
-    items_path: Path,
-    skills_path: Path,
-) -> tuple[AutocompleteSuggestion, ...]: ...
-
-def suggestions_for_mode(
-    suggestions: tuple[AutocompleteSuggestion, ...],
-    mode: DatabaseMode,
-) -> tuple[AutocompleteSuggestion, ...]: ...
-```
-
-```python
-# toram_search/router.py
-def search_database(
-    mode: DatabaseMode,
-    query: str,
-    *,
-    items_path: Path,
-    skills_path: Path,
-) -> UniversalSearchOutcome: ...
-```
-
-```python
-# ui/search.py
-@dataclass(frozen=True)
-class SearchSubmission:
-    query: str
-    nonce: int
-
-
-def render_search_box(
-    *,
-    value: str,
-    suggestions: tuple[AutocompleteSuggestion, ...],
-    placeholder: str,
-) -> SearchSubmission | None: ...
-```
+`from __future__ import annotations` prevents runtime evaluation of the type-only references.
 
 ---
 
-### Task 1: Build the Universal Autocomplete Vocabulary
+### Task 1: Build Mode-Aware Autocomplete Vocabulary
 
 **Files:**
 - Create: `toram_search/autocomplete.py`
@@ -143,31 +121,60 @@ def render_search_box(
 
 **Interfaces:**
 - Consumes: domain service `list_autocomplete_values()` methods.
-- Produces: immutable `AutocompleteSuggestion` index and mode filtering.
+- Produces: immutable suggestion tuples for one selected database mode.
 
-- [ ] **Step 1: Write failing autocomplete tests**
+Target signatures:
 
-Create `tests/test_autocomplete.py` using both test database factories:
+```python
+def build_item_autocomplete_index(items_path: Path) -> tuple[AutocompleteSuggestion, ...]:
+    ...
+
+
+def build_skill_autocomplete_index(skills_path: Path) -> tuple[AutocompleteSuggestion, ...]:
+    ...
+
+
+def build_autocomplete_index(
+    mode: DatabaseMode,
+    *,
+    items_path: Path,
+    skills_path: Path,
+) -> tuple[AutocompleteSuggestion, ...]:
+    ...
+```
+
+The first two functions open only their own domain service. The third dispatches:
+
+```text
+Universal -> item index + skill index
+Items     -> item index only
+Skills    -> skill index only
+```
+
+- [ ] **Step 1: Write failing mode-isolation tests**
+
+Create `tests/test_autocomplete.py` using the item and skill test database factories:
 
 ```python
 from pathlib import Path
 
 from tests.item_db_factory import create_item_database
 from tests.skill_db_factory import create_skill_database
-from toram_search.autocomplete import build_autocomplete_index, suggestions_for_mode
+from toram_search.autocomplete import build_autocomplete_index
 
 
-def databases(tmp_path: Path) -> tuple[Path, Path]:
+def test_universal_index_contains_both_domains(tmp_path: Path) -> None:
     items = tmp_path / "items.sqlite"
     skills = tmp_path / "skills.sqlite"
     create_item_database(items)
     create_skill_database(skills)
-    return items, skills
 
+    index = build_autocomplete_index(
+        "Universal",
+        items_path=items,
+        skills_path=skills,
+    )
 
-def test_universal_index_contains_labeled_item_and_skill_values(tmp_path: Path) -> None:
-    items, skills = databases(tmp_path)
-    index = build_autocomplete_index(items, skills)
     pairs = {(row.value, row.kind) for row in index}
     assert ("Test Bow", "Item") in pairs
     assert ("Guardian", "Skill") in pairs
@@ -175,57 +182,58 @@ def test_universal_index_contains_labeled_item_and_skill_values(tmp_path: Path) 
     assert ("Critical Rate", "Stat") in pairs
 
 
-def test_items_mode_excludes_skill_suggestions(tmp_path: Path) -> None:
-    items, skills = databases(tmp_path)
-    index = build_autocomplete_index(items, skills)
-    filtered = suggestions_for_mode(index, "Items")
-    assert all(row.kind in {"Item", "Stat", "Item Type"} for row in filtered)
+def test_items_index_does_not_open_missing_skill_database(tmp_path: Path) -> None:
+    items = tmp_path / "items.sqlite"
+    create_item_database(items)
+
+    index = build_autocomplete_index(
+        "Items",
+        items_path=items,
+        skills_path=tmp_path / "missing-skills.sqlite",
+    )
+
+    assert any(row.kind == "Item" for row in index)
+    assert all(row.kind in {"Item", "Stat", "Item Type"} for row in index)
 
 
-def test_skills_mode_excludes_item_suggestions(tmp_path: Path) -> None:
-    items, skills = databases(tmp_path)
-    index = build_autocomplete_index(items, skills)
-    filtered = suggestions_for_mode(index, "Skills")
-    assert all(row.kind in {"Skill", "Skill Tree", "Ailment"} for row in filtered)
+def test_skills_index_does_not_open_missing_item_database(tmp_path: Path) -> None:
+    skills = tmp_path / "skills.sqlite"
+    create_skill_database(skills)
+
+    index = build_autocomplete_index(
+        "Skills",
+        items_path=tmp_path / "missing-items.sqlite",
+        skills_path=skills,
+    )
+
+    assert any(row.kind == "Skill" for row in index)
+    assert all(row.kind in {"Skill", "Skill Tree", "Ailment"} for row in index)
 ```
 
-- [ ] **Step 2: Run and verify failure**
+- [ ] **Step 2: Run tests and verify failure**
 
 ```bash
 pytest tests/test_autocomplete.py -v
 ```
 
-Expected: import/model failure.
+Expected: import/model failure because the integration module does not exist.
 
-- [ ] **Step 3: Add shared integration models**
+- [ ] **Step 3: Add integration dataclasses**
 
-Add the locked `SuggestionKind`, `AutocompleteSuggestion`, and `UniversalSearchOutcome` to `toram_search/models.py`. Import the item/skill outcome types only under `TYPE_CHECKING` if needed to avoid circular imports; alternatively store them as forward references with `from __future__ import annotations`.
+Add the locked models above to `toram_search/models.py`.
 
-- [ ] **Step 4: Implement index construction with short-lived services**
+- [ ] **Step 4: Implement item autocomplete construction**
 
-Create `toram_search/autocomplete.py`:
+Create `toram_search/autocomplete.py`. `build_item_autocomplete_index()` must:
 
-```python
-def build_autocomplete_index(items_path: Path, skills_path: Path) -> tuple[AutocompleteSuggestion, ...]:
-    item_service = ItemSearchService(items_path)
-    skill_service = SkillSearchService(skills_path)
-    try:
-        values = [
-            AutocompleteSuggestion(value=value, label=value, kind=kind)
-            for value, kind in item_service.list_autocomplete_values()
-        ]
-        values.extend(
-            AutocompleteSuggestion(value=value, label=value, kind=kind)
-            for value, kind in skill_service.list_autocomplete_values()
-        )
-    finally:
-        item_service.close()
-        skill_service.close()
-    # dedupe by normalized value + kind, then stable sort
-    ...
-```
+1. instantiate `ItemSearchService(items_path)`;
+2. collect `(value, kind)` rows from `list_autocomplete_values()`;
+3. close the service in `finally`;
+4. add validated stat aliases from `STAT_ALIASES` only when the alias target resolves to a real available stat;
+5. deduplicate by `(normalize_stat_text(value), kind)`;
+6. stable-sort by `value.casefold(), kind`.
 
-Add common item aliases to autocomplete without changing parser behavior. For each alias in `toram_search.items.aliases.STAT_ALIASES`, when its canonical target resolves to an available stat, add:
+Alias display shape:
 
 ```python
 AutocompleteSuggestion(
@@ -235,35 +243,45 @@ AutocompleteSuggestion(
 )
 ```
 
-This makes `cr`, `cd`, `pp`, `mres`, etc. discoverable.
+This makes `cr`, `cd`, `pp`, `mres`, and other established aliases discoverable without changing parser semantics.
 
-`build_autocomplete_index()` must not retain either repository/service connection after returning.
+- [ ] **Step 5: Implement skill autocomplete construction**
 
-- [ ] **Step 5: Implement mode filtering**
+`build_skill_autocomplete_index()` must:
+
+1. instantiate `SkillSearchService(skills_path)`;
+2. collect Skill / Skill Tree / Ailment rows;
+3. close in `finally`;
+4. deduplicate by `(normalize_skill_name(value), kind)`;
+5. stable-sort by `value.casefold(), kind`.
+
+- [ ] **Step 6: Implement exact mode dispatch**
 
 ```python
-_ALLOWED_BY_MODE = {
-    "Universal": frozenset({"Item", "Skill", "Skill Tree", "Stat", "Item Type", "Ailment"}),
-    "Items": frozenset({"Item", "Stat", "Item Type"}),
-    "Skills": frozenset({"Skill", "Skill Tree", "Ailment"}),
-}
+def build_autocomplete_index(mode, *, items_path, skills_path):
+    if mode == "Items":
+        return build_item_autocomplete_index(items_path)
+    if mode == "Skills":
+        return build_skill_autocomplete_index(skills_path)
+    if mode == "Universal":
+        rows = (*build_item_autocomplete_index(items_path), *build_skill_autocomplete_index(skills_path))
+        return tuple(rows)
+    raise ValueError(f"Unsupported database mode: {mode}")
 ```
 
-Return the original stable order filtered by allowed kinds.
-
-- [ ] **Step 6: Run tests**
+- [ ] **Step 7: Run tests**
 
 ```bash
 pytest tests/test_autocomplete.py -v
 ```
 
-Expected: all pass.
+Expected: all tests pass.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add toram_search/models.py toram_search/autocomplete.py tests/test_autocomplete.py
-git commit -m "feat: add Universal autocomplete vocabulary"
+git commit -m "feat: add mode-aware autocomplete vocabulary"
 ```
 
 ---
@@ -275,12 +293,25 @@ git commit -m "feat: add Universal autocomplete vocabulary"
 - Create: `tests/test_router.py`
 
 **Interfaces:**
-- Consumes: `DatabaseMode`, item/skill services.
-- Produces: `search_database()` with explicit domain isolation.
+- Consumes: `DatabaseMode`, item service, skill service.
+- Produces: `search_database()` with strict domain isolation.
 
-- [ ] **Step 1: Write routing tests that spy on domain execution**
+Target signature:
 
-Create `tests/test_router.py`. Use monkeypatch service fakes or the test DB factories. At minimum test real outcomes:
+```python
+def search_database(
+    mode: DatabaseMode,
+    query: str,
+    *,
+    items_path: Path,
+    skills_path: Path,
+) -> UniversalSearchOutcome:
+    ...
+```
+
+- [ ] **Step 1: Write failing domain-isolation tests**
+
+Create `tests/test_router.py`:
 
 ```python
 from pathlib import Path
@@ -290,45 +321,49 @@ from tests.skill_db_factory import create_skill_database
 from toram_search.router import search_database
 
 
-def databases(tmp_path: Path) -> tuple[Path, Path]:
+def test_universal_executes_both_domains(tmp_path: Path) -> None:
     items = tmp_path / "items.sqlite"
     skills = tmp_path / "skills.sqlite"
     create_item_database(items)
     create_skill_database(skills)
-    return items, skills
 
-
-def test_universal_returns_both_domain_outcomes(tmp_path: Path) -> None:
-    items, skills = databases(tmp_path)
     outcome = search_database(
-        "Universal", "critical rate", items_path=items, skills_path=skills
+        "Universal",
+        "critical rate",
+        items_path=items,
+        skills_path=skills,
     )
+
     assert outcome.items is not None
     assert outcome.skills is not None
 
 
-def test_items_mode_never_opens_missing_skill_database(tmp_path: Path) -> None:
+def test_items_mode_does_not_open_missing_skills_database(tmp_path: Path) -> None:
     items = tmp_path / "items.sqlite"
     create_item_database(items)
+
     outcome = search_database(
         "Items",
         "Test Bow",
         items_path=items,
         skills_path=tmp_path / "missing-skills.sqlite",
     )
+
     assert outcome.items is not None
     assert outcome.skills is None
 
 
-def test_skills_mode_never_opens_missing_item_database(tmp_path: Path) -> None:
+def test_skills_mode_does_not_open_missing_items_database(tmp_path: Path) -> None:
     skills = tmp_path / "skills.sqlite"
     create_skill_database(skills)
+
     outcome = search_database(
         "Skills",
         "Guardian",
         items_path=tmp_path / "missing-items.sqlite",
         skills_path=skills,
     )
+
     assert outcome.items is None
     assert outcome.skills is not None
 ```
@@ -341,9 +376,7 @@ pytest tests/test_router.py -v
 
 Expected: missing coordinator module.
 
-- [ ] **Step 3: Implement short-lived domain service execution**
-
-Create `toram_search/router.py`:
+- [ ] **Step 3: Implement short-lived service helpers**
 
 ```python
 def _search_items(query: str, path: Path) -> ItemSearchOutcome:
@@ -360,17 +393,34 @@ def _search_skills(query: str, path: Path) -> SkillSearchOutcome:
         return service.search(query)
     finally:
         service.close()
-
-
-def search_database(mode, query, *, items_path, skills_path):
-    items = _search_items(query, items_path) if mode in {"Universal", "Items"} else None
-    skills = _search_skills(query, skills_path) if mode in {"Universal", "Skills"} else None
-    return UniversalSearchOutcome(query=query, items=items, skills=skills)
 ```
 
-Do not add an LLM router or heuristic that suppresses one domain in Universal mode.
+- [ ] **Step 4: Implement coordinator dispatch**
 
-- [ ] **Step 4: Run coordinator tests**
+```python
+def search_database(mode, query, *, items_path, skills_path):
+    if mode == "Items":
+        return UniversalSearchOutcome(
+            query=query,
+            items=_search_items(query, items_path),
+        )
+    if mode == "Skills":
+        return UniversalSearchOutcome(
+            query=query,
+            skills=_search_skills(query, skills_path),
+        )
+    if mode == "Universal":
+        return UniversalSearchOutcome(
+            query=query,
+            items=_search_items(query, items_path),
+            skills=_search_skills(query, skills_path),
+        )
+    raise ValueError(f"Unsupported database mode: {mode}")
+```
+
+Do not add an LLM router or heuristic that suppresses a domain in Universal mode.
+
+- [ ] **Step 5: Run coordinator tests**
 
 ```bash
 pytest tests/test_router.py -v
@@ -378,7 +428,7 @@ pytest tests/test_router.py -v
 
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add toram_search/router.py tests/test_router.py
@@ -397,9 +447,9 @@ git commit -m "feat: add Universal deterministic search coordinator"
 
 **Interfaces:**
 - Consumes: `AutocompleteSuggestion` objects.
-- Produces: one `SearchSubmission` only when Enter/Search is used.
+- Produces: a `SearchSubmission` only when Enter/Search is used.
 
-Component input arguments:
+Component input:
 
 ```json
 {
@@ -422,24 +472,19 @@ Component output on submit only:
 }
 ```
 
-The `nonce` must change on every submission so submitting the same query twice still creates a component value change.
+`nonce` changes on every submission so submitting the same query twice still produces a new component value.
 
-- [ ] **Step 1: Restore the historical component files from target repo history**
-
-From commit `6560bc0c6bdaddf428feae1f00624b6c11cd1de3`, restore:
+- [ ] **Step 1: Restore only the old component files**
 
 ```bash
+mkdir -p components/autocomplete_search
 git show 6560bc0c6bdaddf428feae1f00624b6c11cd1de3:components/autocomplete_search/index.html > components/autocomplete_search/index.html
 git show 6560bc0c6bdaddf428feae1f00624b6c11cd1de3:components/autocomplete_search/streamlit_bridge.js > components/autocomplete_search/streamlit_bridge.js
 ```
 
-Do not restore old `main.py`, CSV, or pandas modules.
+- [ ] **Step 2: Convert suggestion data from strings to objects**
 
-- [ ] **Step 2: Change suggestion data from strings to objects**
-
-In `index.html`, store suggestions as objects with `value`, `label`, `kind`.
-
-Change normalization/scoring to use both `value` and `label`:
+In `index.html`, use objects with `value`, `label`, `kind`. Score this combined client-side text:
 
 ```javascript
 function suggestionText(item) {
@@ -447,21 +492,21 @@ function suggestionText(item) {
 }
 ```
 
-`getMatches()` scores `suggestionText(item)` but inserts `item.value` into the input when accepted.
+When a suggestion is accepted, put `item.value` into the input.
 
-- [ ] **Step 3: Render kind badges**
+- [ ] **Step 3: Render safe kind badges**
 
-For each suggestion row render escaped label plus a small right-aligned kind badge. Do not use unescaped `innerHTML` for database values; create DOM nodes and assign `.textContent`.
+Create DOM nodes and assign `.textContent` for both label and kind. Do not interpolate database values into `innerHTML`.
 
-- [ ] **Step 4: Remove every non-submit Python event**
+- [ ] **Step 4: Remove all non-submit Python events**
 
-Delete the old behavior:
+Delete the old blur send:
 
 ```javascript
 input.addEventListener("blur", () => sendValue(input.value));
 ```
 
-On `input`, only call client-side `updatePreview()`.
+On ordinary `input`, only run browser-side preview/filtering.
 
 On Tab or suggestion click:
 
@@ -469,10 +514,10 @@ On Tab or suggestion click:
 fill input
 update preview
 keep focus
-DO NOT call Streamlit.setComponentValue
+do not call Streamlit.setComponentValue
 ```
 
-- [ ] **Step 5: Add a visible Search button inside the component**
+- [ ] **Step 5: Add the visible Search button inside the component**
 
 Add:
 
@@ -480,9 +525,7 @@ Add:
 <button id="submit" type="button">Search</button>
 ```
 
-Use a layout where the input occupies available width and button sits to the right on desktop, wrapping cleanly on narrow screens.
-
-Create:
+Implement:
 
 ```javascript
 function submitQuery() {
@@ -498,18 +541,19 @@ function submitQuery() {
 
 Call `submitQuery()` only from Enter and Search button click.
 
-- [ ] **Step 6: Keep Tab autocomplete advisory**
-
-Tab accepts the current best suggestion but does not submit. Arrow-key selection may be added only if implemented fully; do not leave half-working keyboard state.
-
-- [ ] **Step 7: Add the Python component wrapper**
+- [ ] **Step 6: Add a Python wrapper with a pure payload parser**
 
 Create `ui/search.py`:
 
 ```python
+from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
+
 import streamlit.components.v1 as components
+
+from toram_search.models import AutocompleteSuggestion
 
 _COMPONENT_PATH = Path(__file__).resolve().parents[1] / "components" / "autocomplete_search"
 _autocomplete_search = components.declare_component(
@@ -517,13 +561,29 @@ _autocomplete_search = components.declare_component(
     path=str(_COMPONENT_PATH),
 )
 
+
 @dataclass(frozen=True)
 class SearchSubmission:
     query: str
     nonce: int
 
 
-def render_search_box(*, value, suggestions, placeholder):
+def parse_component_submission(payload: object) -> SearchSubmission | None:
+    if not isinstance(payload, dict) or payload.get("event") != "submit":
+        return None
+    query = str(payload.get("value", "")).strip()
+    nonce = payload.get("nonce")
+    if not query or not isinstance(nonce, int):
+        return None
+    return SearchSubmission(query, nonce)
+
+
+def render_search_box(
+    *,
+    value: str,
+    suggestions: tuple[AutocompleteSuggestion, ...],
+    placeholder: str,
+) -> SearchSubmission | None:
     payload = _autocomplete_search(
         value=value,
         suggestions=[
@@ -534,26 +594,28 @@ def render_search_box(*, value, suggestions, placeholder):
         key="database-search",
         default=None,
     )
-    if not isinstance(payload, dict) or payload.get("event") != "submit":
-        return None
-    query = str(payload.get("value", "")).strip()
-    nonce = payload.get("nonce")
-    if not query or not isinstance(nonce, int):
-        return None
-    return SearchSubmission(query=query, nonce=nonce)
+    return parse_component_submission(payload)
 ```
 
-- [ ] **Step 8: Add a pure payload parser test**
+- [ ] **Step 7: Test payload parsing**
 
-Extract `parse_component_submission(payload: object) -> SearchSubmission | None` from `render_search_box()` and test:
+Append:
 
 ```python
-assert parse_component_submission({"event": "submit", "value": " Guardian ", "nonce": 1}) == SearchSubmission("Guardian", 1)
-assert parse_component_submission({"event": "select", "value": "Guardian", "nonce": 1}) is None
-assert parse_component_submission(None) is None
+from ui.search import SearchSubmission, parse_component_submission
+
+
+def test_only_submit_payload_creates_search() -> None:
+    assert parse_component_submission(
+        {"event": "submit", "value": " Guardian ", "nonce": 1}
+    ) == SearchSubmission("Guardian", 1)
+    assert parse_component_submission(
+        {"event": "select", "value": "Guardian", "nonce": 2}
+    ) is None
+    assert parse_component_submission(None) is None
 ```
 
-- [ ] **Step 9: Run tests**
+- [ ] **Step 8: Run tests**
 
 ```bash
 pytest tests/test_autocomplete.py -v
@@ -561,7 +623,7 @@ pytest tests/test_autocomplete.py -v
 
 Expected: all pass.
 
-- [ ] **Step 10: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add components/autocomplete_search ui/search.py tests/test_autocomplete.py
@@ -570,19 +632,103 @@ git commit -m "feat: add submit-only autocomplete search component"
 
 ---
 
-### Task 4: Build Shared Result Rendering and Final Session State
+### Task 4: Make Database Health and Autocomplete Caching Mode-Aware
 
 **Files:**
-- Create: `ui/results.py`
-- Modify: `ui/sidebar.py`
 - Modify: `main.py`
+- Modify: `tests/test_app_shell.py`
 - Create: `tests/test_universal_app.py`
 
 **Interfaces:**
-- Consumes: `UniversalSearchOutcome`, item/skill rendering helpers.
-- Produces: final search-first page with grouped Universal results.
+- Consumes: `validate_item_database`, `validate_skill_database`, `build_autocomplete_index`.
+- Produces: correct operation when only the selected domain is healthy.
 
-Use these session-state keys exactly:
+- [ ] **Step 1: Write failing AppTest health-isolation tests**
+
+Using environment path overrides from the item/skill phases, test:
+
+```text
+Items + valid item DB + missing skill DB -> app remains usable
+Skills + valid skill DB + missing item DB -> app remains usable
+Universal + either DB missing -> visible error and no search execution
+```
+
+Use assertions on visible `st.error`/absence of `app.exception`, not private Streamlit internals.
+
+- [ ] **Step 2: Replace foundation all-or-nothing validation**
+
+In `main.py` resolve both configured paths, but validate only what the mode requires:
+
+```python
+if mode == "Items":
+    required_health = (validate_item_database(items_path),)
+elif mode == "Skills":
+    required_health = (validate_skill_database(skills_path),)
+else:
+    required_health = (
+        validate_item_database(items_path),
+        validate_skill_database(skills_path),
+    )
+```
+
+If any required health row is unhealthy, display each error then `st.stop()`.
+
+- [ ] **Step 3: Cache immutable mode-specific indexes**
+
+Add:
+
+```python
+@st.cache_data(show_spinner=False)
+def cached_autocomplete(
+    mode: str,
+    items_path: str,
+    skills_path: str,
+    item_mtime: float | None,
+    skill_mtime: float | None,
+):
+    return build_autocomplete_index(
+        mode,
+        items_path=Path(items_path),
+        skills_path=Path(skills_path),
+    )
+```
+
+For Items mode, pass `skill_mtime=None` and do not stat the missing skill path as a requirement. For Skills mode, pass `item_mtime=None`. Universal passes both mtimes.
+
+This ensures replacing a SQLite file invalidates only relevant cached vocabulary.
+
+- [ ] **Step 4: Run focused tests**
+
+```bash
+pytest tests/test_universal_app.py tests/test_app_shell.py -v
+```
+
+Expected: mode-isolation health tests pass.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add main.py tests/test_universal_app.py tests/test_app_shell.py
+git commit -m "fix: isolate database health by selected mode"
+```
+
+---
+
+### Task 5: Replace Temporary Forms With One Final Search Experience
+
+**Files:**
+- Modify: `main.py`
+- Create: `ui/results.py`
+- Modify: `ui/sidebar.py`
+- Modify: `tests/test_universal_app.py`
+- Modify: `tests/test_item_app.py`
+- Modify: `tests/test_skill_app.py`
+
+**Interfaces:**
+- Consumes: `SearchSubmission`, `search_database`, item/skill renderers.
+- Produces: final search-first Universal/Items/Skills page.
+
+Use these session keys:
 
 ```text
 database_mode
@@ -595,108 +741,69 @@ selected_item_id
 selected_skill_id
 ```
 
-- [ ] **Step 1: Write failing Universal AppTest coverage**
+- [ ] **Step 1: Add a deterministic AppTest submission hook**
 
-Create `tests/test_universal_app.py` with test databases via environment overrides. Because custom component interaction is limited in AppTest, test the coordinator/render layer via an injectable test query session-state hook rather than trying to simulate browser JavaScript.
-
-Add one app-only test hook:
+Custom component JavaScript is not reliably driven by `AppTest`, so use this production-inert hook:
 
 ```python
-# main.py
-if os.environ.get("TORAM_TEST_QUERY"):
-    submission = SearchSubmission(
-        query=os.environ["TORAM_TEST_QUERY"],
+def test_submission_from_environment() -> SearchSubmission | None:
+    query = os.environ.get("TORAM_TEST_QUERY")
+    if not query:
+        return None
+    return SearchSubmission(
+        query=query,
         nonce=int(os.environ.get("TORAM_TEST_NONCE", "1")),
     )
-else:
-    submission = render_search_box(...)
 ```
 
-This hook must be documented as test-only and must not alter production behavior when the environment variable is absent.
+In normal use the environment variable is absent and `render_search_box()` is used.
 
-Tests:
+- [ ] **Step 2: Write failing Universal result tests**
 
-```python
-def test_universal_query_renders_item_and_skill_sections(...):
-    # TORAM_TEST_QUERY = "critical rate"
-    # assert headings include Items and Skills and no exception
-
-
-def test_items_mode_can_run_when_skill_db_is_invalid(...):
-    # selected mode Items; missing skill path must not stop app
-
-
-def test_universal_mode_reports_broken_skill_db(...):
-    # missing skill DB -> visible error, no silent partial Universal results
-```
-
-- [ ] **Step 2: Run and verify failure**
-
-```bash
-pytest tests/test_universal_app.py -v
-```
-
-Expected: integration behavior not implemented yet.
-
-- [ ] **Step 3: Make database validation mode-aware**
-
-Replace the foundation behavior that stops on any unhealthy database.
-
-Rules:
+With both fixture DBs and `TORAM_TEST_QUERY`, assert:
 
 ```text
-Universal -> both Items and Skills must validate
-Items -> only Items must validate; Skills health may be shown unobtrusively but cannot block search
-Skills -> only Skills must validate; Items health cannot block search
+Universal query -> Items section exists and Skills section exists
+Items mode -> only Items section rendered
+Skills mode -> only Skills section rendered
+new nonce + same query -> search accepted again
 ```
 
-If a required database fails, show its exact `DatabaseHealth.error` and stop before invoking search.
+Do not test iframe HTML with AppTest.
 
-- [ ] **Step 4: Cache autocomplete data, not DB connections**
+- [ ] **Step 3: Remove temporary native `st.form` search UIs**
 
-In `main.py`:
-
-```python
-@st.cache_data(show_spinner=False)
-def cached_autocomplete(items_path: str, skills_path: str, item_mtime: float, skill_mtime: float):
-    return build_autocomplete_index(Path(items_path), Path(skills_path))
-```
-
-Pass file mtimes into the cache key so replacing either SQLite file invalidates the index automatically after Streamlit sees the new files.
-
-Do not use `st.cache_resource` for repository/service objects.
-
-- [ ] **Step 5: Replace temporary Items/Skills forms with one search box**
-
-Remove the phase-specific `st.form` blocks. Render one `render_search_box()` regardless of mode.
-
-Mode-specific placeholders:
+Render one component for every mode:
 
 ```python
-{
+PLACEHOLDERS = {
     "Universal": "Search items, stats, skills...",
     "Items": "Search items or stats...",
     "Skills": "Search skills or skill trees...",
 }
 ```
 
-On a new `SearchSubmission` whose nonce differs from `last_submission_nonce`:
+Choose environment test submission first when present; otherwise use `render_search_box()`.
+
+- [ ] **Step 4: Execute only on a new explicit submission nonce**
+
+When `submission is not None` and its nonce differs from `last_submission_nonce`:
 
 ```text
 store submitted_query
-store nonce
-reset item_visible_limit = 20
-reset skill_visible_limit = 20
-clear selected ids
-execute search_database(mode, query, ...)
-store UniversalSearchOutcome
+store last_submission_nonce
+reset item_visible_limit to 20
+reset skill_visible_limit to 20
+clear selected item/skill ids
+call search_database(mode, query, paths)
+store returned UniversalSearchOutcome
 ```
 
-Changing a Show more button or opening/closing a dialog must not execute `search_database()` again.
+Changing sidebar mode clears stale `search_outcome` so results from another domain are never mislabeled.
 
-- [ ] **Step 6: Add contextual example searches beneath the search box**
+- [ ] **Step 5: Add explicit example-submit buttons**
 
-Examples:
+Use:
 
 ```python
 EXAMPLES = {
@@ -706,11 +813,11 @@ EXAMPLES = {
 }
 ```
 
-Example buttons may directly create a `SearchSubmission` with a monotonically increasing session nonce and execute immediately because clicking them is an explicit submit action.
+Clicking an example is an explicit submit action. Generate a monotonically increasing integer from session state rather than current wall-clock time, then call the same submission handler used by the component.
 
-- [ ] **Step 7: Implement `ui/results.py`**
+- [ ] **Step 6: Implement shared result rendering**
 
-Expose:
+Create `ui/results.py`:
 
 ```python
 def render_universal_results(
@@ -719,7 +826,7 @@ def render_universal_results(
     item_visible_limit: int,
     skill_visible_limit: int,
 ) -> tuple[int | None, str | None, bool, bool]:
-    """Return selected item id, selected skill id, show_more_items, show_more_skills."""
+    """Return selected item id, selected skill id, show-more-items, show-more-skills."""
 ```
 
 Universal layout:
@@ -727,22 +834,18 @@ Universal layout:
 ```text
 Results for "<query>"
 
-Items · <total result count>
+Items · <total>
 [item cards]
 [Show more items]
 
-Skills · <total result count>
+Skills · <total>
 [skill cards]
 [Show more skills]
 ```
 
-If one domain returns `help`, `meta`, `structured`, `suggest`, or `refuse`, render its message in that domain section. Do not hide a valid result from the other domain.
+For a domain outcome that is `help`, `meta`, `structured`, `compare`, `clarify`, `suggest`, `refuse`, or `not_found`, render its deterministic message in that domain section while preserving any valid result cards supplied by that outcome.
 
-Items-only / Skills-only mode can use the same renderer but omit the absent section.
-
-- [ ] **Step 8: Wire independent Show more state**
-
-Increment only the requested domain by 20:
+- [ ] **Step 7: Wire independent Show more state**
 
 ```python
 if show_more_items:
@@ -751,30 +854,31 @@ if show_more_skills:
     st.session_state.skill_visible_limit += 20
 ```
 
-Never modify the stored search outcome.
+Do not call `search_database()` from Show more.
 
-- [ ] **Step 9: Wire item/skill detail dialogs with short-lived services**
+- [ ] **Step 8: Wire one detail dialog per run**
 
-When a clicked ID is returned:
+When an item ID is selected:
 
 ```text
-instantiate corresponding service
-fetch exactly one detail record
+open short-lived ItemSearchService
+fetch get_item(id)
 close service
-render dialog
+render item dialog
+clear any skill selection
 ```
 
-Only one dialog may be invoked in one script run. If both selected IDs somehow exist, item selection takes priority and skill selection is cleared, or vice versa based on the latest click. Never call both dialog functions in the same run.
+When a skill ID is selected, perform the symmetric skill flow. Never call both dialog functions in one script run.
 
-- [ ] **Step 10: Run Universal app tests**
+- [ ] **Step 9: Run app tests**
 
 ```bash
 pytest tests/test_universal_app.py tests/test_item_app.py tests/test_skill_app.py tests/test_app_shell.py -v
 ```
 
-Expected: all pass after updating older phase tests for the single final search component.
+Expected: all pass after adapting the older phase tests to the final single search component.
 
-- [ ] **Step 11: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
 git add main.py ui/results.py ui/sidebar.py tests/test_universal_app.py tests/test_item_app.py tests/test_skill_app.py tests/test_app_shell.py
@@ -783,7 +887,7 @@ git commit -m "feat: integrate Universal Streamlit search"
 
 ---
 
-### Task 5: Finish User-Friendly Layout, Help, Credits, and Refinement Surface
+### Task 6: Finish Search-First Layout, Help, Credits, and Responsive Cards
 
 **Files:**
 - Modify: `main.py`
@@ -796,11 +900,11 @@ git commit -m "feat: integrate Universal Streamlit search"
 
 **Interfaces:**
 - Consumes: final search state.
-- Produces: polished responsive public page matching the approved design.
+- Produces: approved public UX without a permanent advanced-filter form.
 
-- [ ] **Step 1: Keep the sidebar minimal**
+- [ ] **Step 1: Finalize the minimal sidebar**
 
-Final sidebar content:
+Final content:
 
 ```text
 Toram Database
@@ -815,46 +919,26 @@ Credits
 GitHub
 ```
 
-Use expanders or link buttons for About/Credits/GitHub; do not place permanent advanced filters in the sidebar.
+Use Streamlit links/expanders for secondary information. Keep search controls out of the sidebar.
 
-Credits must clearly acknowledge the database/source project used by this repository and preserve any Coryn Club attribution already present in the historical app where applicable.
+- [ ] **Step 2: Add deterministic Search Help**
 
-- [ ] **Step 2: Add a compact optional Filters control near search**
-
-Version 1 filters are secondary and may use an expander/popover beside/below search. Implement only deterministic fields already supported:
-
-Items:
+Show examples and syntax from stored/static help only:
 
 ```text
-Item type
-Sort: Relevance / Highest / Lowest when a stat is selected
+Item name: Amnis Rapier
+Stat + type: cr bow
+Numeric: hp >= 5000 armor
+Boolean: hp > 5000 and cr bow
+Skill: Guardian
+Skill tree: shield skills
+Skill property: guardian mp cost
+Ailment: skills that inflict stun
 ```
 
-Skills:
+No generated help answer is required.
 
-```text
-Skill tree
-Tier
-Ailment
-```
-
-Universal may hide the control initially unless a result domain is selected/refined. Search must remain usable without opening Filters.
-
-Do not invent subjective DPS/tank filters.
-
-- [ ] **Step 3: Add contextual refinement buttons only from current results**
-
-If implemented, derive chips from observed result fields (item types, skill trees, tiers, ailments). Clicking a chip is an explicit deterministic refinement action and may re-run search with a structured filter state.
-
-If this cannot be implemented cleanly without duplicating parser behavior, omit contextual chips from v1 rather than shipping a partial/inconsistent control. The approved design marks them optional.
-
-- [ ] **Step 4: Ensure responsive cards**
-
-Use `st.columns(2)` only on wide layouts where card content remains readable. Keep a one-column fallback path for narrow/mobile layout. Do not rely on unsupported browser-width detection; prefer a simple Streamlit layout that naturally stacks when constrained, or default to one-column if two-column behavior is unreliable.
-
-Correctness/readability has priority over forcing two columns.
-
-- [ ] **Step 5: Keep card summaries compact**
+- [ ] **Step 3: Keep cards compact**
 
 Item card maximum summary:
 
@@ -871,43 +955,34 @@ Skill card maximum summary:
 name
 tree · tier
 MP / type
-one matched field when relevant
+one query-matched field when relevant
 View details
 ```
 
-- [ ] **Step 6: Add deterministic Search Help**
+Prefer one-column rendering if a stable responsive two-column implementation cannot be achieved with Streamlit without brittle browser detection. Readability is more important than forced density.
 
-Expose help examples without an LLM:
+- [ ] **Step 4: Add final credits and links**
 
-```text
-Item name: Amnis Rapier
-Stat + type: cr bow
-Numeric: hp >= 5000 armor
-Boolean: hp > 5000 and cr bow
-Skill: Guardian
-Skill tree: shield skills
-Skill property: guardian mp cost
-Ailment: skills that inflict stun
-```
+Preserve Coryn Club/source attribution from the historical app where applicable and add a GitHub link for `KarenYuusha/toram-item-search`. Do not present `filter_search` as the deployed website repository.
 
-- [ ] **Step 7: Update README with final architecture and UI behavior**
+- [ ] **Step 5: Update README**
 
 Document:
 
 ```text
-Universal / Items / Skills
-autocomplete is client-side advisory
-Enter/Search submits
-items.sqlite / skills.sqlite are drop-in copies from filter_search
-no LLM/RAG
-main.py is Streamlit entry point
+Universal / Items / Skills behavior
+client-side autocomplete
+Enter/Search-only execution
+items.sqlite / skills.sqlite are direct drop-in copies from filter_search
+no LLM/RAG/embeddings
+root main.py deployment entry point
 ```
 
-- [ ] **Step 8: Add AppTest assertions for final labels**
+- [ ] **Step 6: Add final AppTest assertions**
 
-Assert title, subtitle, mode selector, and no exception. Do not make brittle assertions on custom component iframe internals.
+Assert title, subtitle, three database modes, no startup exception with fixture DBs, and expected domain section headings after test submissions. Avoid brittle iframe internals.
 
-- [ ] **Step 9: Run full test suite**
+- [ ] **Step 7: Run all tests**
 
 ```bash
 pytest -q
@@ -915,7 +990,7 @@ pytest -q
 
 Expected: all tests pass.
 
-- [ ] **Step 10: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add main.py ui .streamlit/config.toml README.md tests/test_universal_app.py
@@ -924,10 +999,10 @@ git commit -m "feat: polish Streamlit Toram database UI"
 
 ---
 
-### Task 6: Deployment and Regression Verification
+### Task 7: Deployment and Regression Verification
 
 **Files:**
-- Modify only if verification exposes a bug; otherwise no file changes.
+- Modify only when a failing verification demonstrates a concrete bug.
 
 - [ ] **Step 1: Run the complete automated suite**
 
@@ -950,18 +1025,24 @@ PY
 
 Expected: both healthy.
 
-- [ ] **Step 3: Scan runtime dependencies/source for forbidden LLM stack**
+- [ ] **Step 3: Scan runtime source/dependencies for forbidden model stack**
 
 ```bash
 python - <<'PY'
 from pathlib import Path
+
 runtime = Path("requirements.txt").read_text().casefold()
-source = "\n".join(
-    path.read_text(errors="ignore")
-    for root in (Path("main.py"), Path("toram_search"), Path("ui"))
-    for path in ([root] if root.is_file() else root.rglob("*.py"))
-).casefold()
-for forbidden in ("ollama", "qwen", "gemma", "sentence_transformers", "discord.py", "groundedskillrag"):
+paths = [Path("main.py"), *Path("toram_search").rglob("*.py"), *Path("ui").rglob("*.py")]
+source = "\n".join(path.read_text(errors="ignore") for path in paths).casefold()
+
+for forbidden in (
+    "ollama",
+    "qwen",
+    "gemma",
+    "sentence_transformers",
+    "discord.py",
+    "groundedskillrag",
+):
     assert forbidden not in runtime, ("requirements", forbidden)
     assert forbidden not in source, ("source", forbidden)
 PY
@@ -969,26 +1050,33 @@ PY
 
 Expected: exit 0.
 
-- [ ] **Step 4: Verify no public write statements exist**
+- [ ] **Step 4: Verify no public mutation SQL exists**
 
 ```bash
 python - <<'PY'
 from pathlib import Path
 text = "\n".join(path.read_text(errors="ignore") for path in Path("toram_search").rglob("*.py")).casefold()
-for phrase in ("insert into items", "update items", "delete from items", "insert into skills", "update skills", "delete from skills"):
+for phrase in (
+    "insert into items",
+    "update items",
+    "delete from items",
+    "insert into skills",
+    "update skills",
+    "delete from skills",
+):
     assert phrase not in text, phrase
 PY
 ```
 
 Expected: exit 0.
 
-- [ ] **Step 5: Manually run Streamlit**
+- [ ] **Step 5: Launch Streamlit manually**
 
 ```bash
 streamlit run main.py --server.headless true
 ```
 
-Verify all three modes and these representative submissions:
+Exercise:
 
 ```text
 Universal: critical rate
@@ -1001,34 +1089,33 @@ Skills: skills that inflict stun
 Skills: how does Hard Hit work?
 ```
 
-Also verify:
+Verify:
 
 ```text
-typing does not trigger a server rerun/search
-Tab fills a suggestion without submitting
-clicking suggestion fills without submitting
+typing does not trigger full search
+Tab fills without submitting
+suggestion click fills without submitting
 Enter submits
 Search button submits
-submitting the same query twice still works
-Show more does not repeat DB search
-item detail modal opens/closes cleanly
-skill detail modal opens/closes cleanly
-mobile/narrow layout remains readable
+same query can be submitted twice
+Show more does not re-query
+item dialog opens/closes
+skill dialog opens/closes
+narrow/mobile layout stays readable
 ```
 
-- [ ] **Step 6: Verify deployment metadata**
+- [ ] **Step 6: Verify deployment settings**
 
-Confirm Streamlit Community Cloud is configured to use:
+Streamlit Community Cloud must use:
 
 ```text
 Repository: KarenYuusha/toram-item-search
-Branch: the implementation branch until merged, then main
 Main file path: main.py
 ```
 
-- [ ] **Step 7: Check update workflow once with copied DBs**
+Use the implementation branch for preview if desired; production uses `main` after merge.
 
-After making backup copies, replace from the reference repo:
+- [ ] **Step 7: Verify the actual database replacement workflow**
 
 ```bash
 cp ../filter_search/coryn_data/database/items.sqlite ./items.sqlite
@@ -1036,16 +1123,26 @@ cp ../filter_search/coryn_data/database/skills.sqlite ./skills.sqlite
 pytest -q
 ```
 
-Expected: tests and schema validation pass without any rebuild step.
+Expected: tests/schema checks pass without any build or migration command.
 
-- [ ] **Step 8: Final implementation commit only if verification required fixes**
+- [ ] **Step 8: Commit verification fixes only when files actually changed**
 
-If no fixes were required, do not create an empty commit. If fixes were needed:
+If verification required fixes, first inspect exactly what changed:
 
 ```bash
-git add <only verified fix files>
+git status --short
+git diff --check
+```
+
+Stage only the concrete files shown by `git status --short`, then verify the staged diff:
+
+```bash
+git diff --cached --check
+git diff --cached --stat
 git commit -m "fix: resolve Streamlit integration regressions"
 ```
+
+If no files changed, do not create an empty commit.
 
 ---
 
@@ -1055,19 +1152,22 @@ The implementation is complete only when all of the following are true:
 
 - `main.py` runs the public Streamlit UI.
 - Universal is the default database mode.
-- Items and Skills modes restrict execution to their own database.
-- Universal returns all applicable item and skill outcomes in separate sections.
+- Items mode remains usable even when the skill DB path is unavailable.
+- Skills mode remains usable even when the item DB path is unavailable.
+- Universal requires both DBs and never silently serves incomplete mixed results.
+- Universal returns applicable item and skill outcomes in separate sections.
 - autocomplete shows Item / Skill / Skill Tree / Stat / Item Type / Ailment labels.
-- typing does not execute the full search.
-- Enter and Search button execute the full search.
+- typing does not execute full search.
+- Enter and Search button execute full search.
+- suggestion click/Tab only fills the input.
 - compact cards are used for results.
 - item and skill full records use dialogs.
 - matched stats/properties are visible on cards.
 - Show more is independent per domain.
 - failures provide deterministic guidance/suggestions.
-- subjective build/DPS/tank questions are not invented/answered subjectively.
+- subjective build/DPS/tank questions are not answered subjectively.
 - `items.sqlite` and `skills.sqlite` remain direct drop-in copies from `filter_search`.
 - both DBs are opened read-only.
 - no LLM/RAG/embedding runtime exists.
 - full automated suite passes.
-- Streamlit Community Cloud can start from root `main.py`.
+- Streamlit Community Cloud starts from root `main.py`.
