@@ -61,3 +61,32 @@ def test_real_universal_aggro_xtal_wp_suppresses_unrelated_skills() -> None:
     assert len(item_ids) == len(set(item_ids))
     assert outcome.skills is not None
     assert not outcome.skills.results
+
+
+def test_real_aggro_weapon_crysta_query_exposes_item_interpretation() -> None:
+    outcome = search_database(
+        'Universal',
+        'aggro xtal wp',
+        items_path=ITEM_DATABASE,
+        skills_path=SKILL_DATABASE,
+    )
+    assert outcome.interpretation is not None
+    assert outcome.interpretation.domain == 'Items'
+    assert [(chip.kind, chip.label) for chip in outcome.interpretation.chips] == [
+        ('stat', 'Aggro %'),
+        ('item_type', 'Weapon Crysta'),
+    ]
+    item_type = next(chip for chip in outcome.interpretation.chips if chip.kind == 'item_type')
+    assert outcome.interpretation.query_without(item_type.id) == 'aggro'
+
+
+def test_real_exact_guardian_has_no_interpretation_chips() -> None:
+    outcome = search_database(
+        'Universal',
+        'Guardian',
+        items_path=ITEM_DATABASE,
+        skills_path=SKILL_DATABASE,
+    )
+    assert outcome.skills is not None
+    assert any(row.skill.name.casefold() == 'guardian' for row in outcome.skills.results)
+    assert outcome.interpretation is None

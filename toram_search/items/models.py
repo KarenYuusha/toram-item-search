@@ -2,6 +2,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from toram_search.interpretation import QueryInterpretation, RouteQuality
+
 @dataclass(frozen=True)
 class ItemSummary:
     id: int
@@ -47,6 +49,8 @@ class ItemSearchOutcome:
     message: str | None = None
     suggested_queries: tuple[str, ...] = ()
     routing_confidence: RoutingConfidence = "none"
+    interpretation: QueryInterpretation | None = None
+    route_quality: RouteQuality = RouteQuality()
 
 @dataclass(frozen=True)
 class ParsedClause:

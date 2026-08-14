@@ -23,6 +23,17 @@ def _search_skills(query: str, path: Path, *, allow_weak_fallback: bool = True):
         service.close()
 
 
+def select_winning_interpretation(items, skills):
+    candidates = []
+    if items is not None:
+        candidates.append((items.route_quality.sort_key, 1, items.interpretation))
+    if skills is not None:
+        candidates.append((skills.route_quality.sort_key, 0, skills.interpretation))
+    if not candidates:
+        return None
+    return max(candidates, key=lambda row: (row[0], row[1]))[2]
+
+
 def search_database(
     mode: DatabaseMode,
     query: str,
@@ -37,15 +48,14 @@ def search_database(
             skills_path,
             allow_weak_fallback=items.routing_confidence != 'strong',
         )
-        return UniversalSearchOutcome(query=query, items=items, skills=skills)
-    if mode == 'Items':
         return UniversalSearchOutcome(
             query=query,
-            items=_search_items(query, items_path),
-            skills=None,
+            items=items,
+            skills=skills,
+            interpretation=select_winning_interpretation(items, skills),
         )
-    return UniversalSearchOutcome(
-        query=query,
-        items=None,
-        skills=_search_skills(query, skills_path),
-    )
+    if mode == 'Items':
+        items = _search_items(query, items_path)
+        return UniversalSearchOutcome(query=query, items=items, interpretation=items.interpretation)
+    skills = _search_skills(query, skills_path)
+    return UniversalSearchOutcome(query=query, skills=skills, interpretation=skills.interpretation)
