@@ -18,7 +18,7 @@ Food uses the committed root files `food_entries.csv` and `food_stat_aliases.jso
 
 Food search is deliberately opt-in: it runs only when the normalized query begins with `food` or `code`, followed by a supported Food stat or alias. Food codes are result values, not searchable identifiers.
 
-Registlet search supports three deterministic routes: Stoodie source level, Registlet name, and Registlet effect text. Bare effect searches are allowed in Universal mode, but effect matches are weaker than exact/structured routes so they cannot pollute strong Item, Skill, Food, or Registlet matches.
+Registlet search supports three deterministic primary routes: Stoodie source level, Registlet name, and Registlet effect text, plus a fuzzy-name fallback. Bare effect searches are allowed in Universal mode, but effect matches are weaker than exact/structured routes so they cannot pollute strong Item, Skill, Food, or Registlet matches.
 
 The feature remains fully deterministic. It does not add an LLM, embeddings, RAG, or probabilistic intent inference.
 
@@ -255,7 +255,7 @@ Food pagination/show-more behavior should follow the existing submit-only state 
 
 ## Registlet Query Contract
 
-Registlet search has three routes, evaluated in this precedence order:
+Registlet search has three primary routes plus one fallback, evaluated in this precedence order:
 
 1. Stoodie structured route;
 2. Registlet exact-name route;
