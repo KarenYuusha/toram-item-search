@@ -80,6 +80,37 @@ def test_committed_registlets_support_stoodie_and_effect_search() -> None:
     assert effect.route_quality.family == 'content'
 
 
+def test_real_item_repository_exposes_no_registlet_item_types() -> None:
+    with ItemRepository(ITEM_DATABASE) as repository:
+        assert all(
+            row.item_type.strip().casefold() not in {'regislet', 'registlet'}
+            for row in repository.list_items()
+        )
+
+
+def test_real_registlet_search_is_served_from_json() -> None:
+    outcome = RegistletSearchService(REGISTLET_DATA).search('std 220')
+
+    assert outcome.results
+    assert all(220 in row.source_levels for row in outcome.results)
+
+
+def test_real_universal_registlet_name_never_surfaces_as_item() -> None:
+    service = RegistletSearchService(REGISTLET_DATA)
+    name = service.dataset.records[0].name
+    outcome = search_database(
+        'Universal',
+        name,
+        items_path=ITEM_DATABASE,
+        skills_path=SKILL_DATABASE,
+    )
+
+    assert outcome.registlets is not None
+    assert any(row.name.casefold() == name.casefold() for row in outcome.registlets.results)
+    assert outcome.items is not None
+    assert all(row.item.name.casefold() != name.casefold() for row in outcome.items.results)
+
+
 def test_real_universal_aggro_xtal_wp_suppresses_unrelated_skills() -> None:
     outcome = search_database(
         'Universal',
