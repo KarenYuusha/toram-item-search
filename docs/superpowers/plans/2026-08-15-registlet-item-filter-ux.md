@@ -4,29 +4,29 @@
 
 **Goal:** Hide contaminated `Regislet`/`Registlet` rows from every Item-facing path, keep `registlets.json` authoritative, and add focused Registlet/search UX improvements without changing source data.
 
-**Architecture:** Make the contamination rule an Item-repository invariant so autocomplete, parsers, services, and Universal routing inherit the same filtered Item view. Add one outcome-level Registlet match descriptor because each successful Registlet query uses exactly one route for all returned records. Keep the existing Food level grouping and `st.code` presentation unless acceptance tests prove a real gap.
+**Architecture:** Enforce contamination filtering at the Item repository boundary so parsers, autocomplete, services, and Universal routing inherit the same view. Add one outcome-level Registlet match descriptor because every successful Registlet search uses exactly one route for all returned records. Preserve existing Food level grouping/code-block rendering unless acceptance tests expose a real gap.
 
 **Tech Stack:** Python 3.12, Streamlit 1.61.x, SQLite read-only repositories, RapidFuzz 3.x, pytest 8.x, JSON/CSV project data.
 
 ## Global Constraints
 
 - Do not modify `items.sqlite`, `skills.sqlite`, `food_entries.csv`, `food_stat_aliases.json`, or `registlets.json`.
-- `registlets.json` is the only Registlet search/display source.
-- Exclude `Regislet` and `Registlet` item types case-insensitively with surrounding whitespace ignored.
-- Excluded rows are invisible to Item listing, vocabulary, counts, exact/fuzzy/stat/structured search, autocomplete, detail access, Universal Item routing, and upgrade relationships.
+- `registlets.json` is the only source of Registlet search/display data.
+- Exclude `Regislet` and `Registlet` item types case-insensitively; ignore surrounding whitespace.
+- Excluded rows are invisible to Item lists, vocabulary, counts, exact/fuzzy/stat/structured search, autocomplete, detail access, Universal Item routing, and upgrade relationships.
 - `ItemRepository.get_item(excluded_id)` raises `KeyError`.
-- Upgrade lists omit excluded rows and never replace them with `Unknown item`.
-- Registlet search precedence stays Stoodie structured → exact name → effect content → fuzzy-name fallback.
-- Do not add fuzzy effect matching or infer Registlet relationships from effect text.
-- Food query grammar remains prefix-gated by `food` or `code`.
+- Upgrade lists omit excluded rows and never create `Unknown item` placeholders for them.
+- Registlet precedence stays Stoodie structured → exact name → effect content → fuzzy-name fallback.
+- Do not add fuzzy effect matching or infer Skill relationships from effect text.
+- Food search remains prefix-gated by `food` or `code`.
 - Suggested searches remain fill-only and never auto-submit.
-- Universal shows exactly three suggested searches; every domain mode shows at most three.
-- No LLM, embeddings, RAG, frontend framework, database migration, or source-data rewrite.
+- Universal shows exactly three suggestions; every domain mode shows at most three.
+- No LLM, embeddings, RAG, frontend framework, migration, or source-data rewrite.
 - Before integration run `python -m pytest -q` and `python -m compileall -q main.py toram_search ui`.
 
 ---
 
-### Task 1: Make Registlet contamination impossible inside the Item repository
+### Task 1: Enforce the Item repository visibility invariant
 
 **Files:**
 - Modify: `toram_search/items/aliases.py`
@@ -40,7 +40,7 @@
 
 - [ ] **Step 1: Add contaminated fixture rows**
 
-Append this helper to `tests/item_db_factory.py`:
+Append to `tests/item_db_factory.py`:
 
 ```python
 def add_registlet_contamination(path: Path) -> None:
@@ -64,7 +64,7 @@ def add_registlet_contamination(path: Path) -> None:
     db.close()
 ```
 
-- [ ] **Step 2: Write the failing repository tests**
+- [ ] **Step 2: Write failing repository/service tests**
 
 Create `tests/test_item_registlet_filter.py`:
 
@@ -74,6 +74,7 @@ from pathlib import Path
 import pytest
 
 from tests.item_db_factory import add_registlet_contamination, create_item_database
+from toram_search.items.aliases import is_registlet_item_type
 from toram_search.items.repository import ItemRepository
 from toram_search.items.service import ItemSearchService
 
@@ -86,17 +87,23 @@ def contaminated_items(tmp_path: Path) -> Path:
     return path
 
 
-def test_repository_hides_registlet_types_from_lists_counts_and_stats(contaminated_items: Path) -> None:
+def test_registlet_item_type_detection_is_case_and_whitespace_insensitive() -> None:
+    assert is_registlet_item_type(' Regislet ')
+    assert is_registlet_item_type('REGISTLET')
+    assert not is_registlet_item_type('Normal Crysta')
+
+
+def test_repository_hides_registlets_from_lists_counts_and_vocabulary(contaminated_items: Path) -> None:
     with ItemRepository(contaminated_items) as repository:
         assert repository.count_items_total() == 8
         assert repository.count_items_by_types(('REGISTLET', ' Regislet ')) == 0
         assert repository.count_items_with_stat('Critical Rate') == 3
         assert 'Physical Pierce %' not in repository.list_stat_names()
-        assert all(row.item_type.strip().casefold() not in {'regislet', 'registlet'} for row in repository.list_items())
-        assert all(value.strip().casefold() not in {'regislet', 'registlet'} for value in repository.list_item_types())
+        assert all(not is_registlet_item_type(row.item_type) for row in repository.list_items())
+        assert all(not is_registlet_item_type(value) for value in repository.list_item_types())
 
 
-def test_repository_denies_direct_detail_and_filters_upgrade_links(contaminated_items: Path) -> None:
+def test_repository_denies_detail_and_filters_upgrade_links(contaminated_items: Path) -> None:
     with ItemRepository(contaminated_items) as repository:
         with pytest.raises(KeyError):
             repository.get_item(90)
@@ -118,17 +125,15 @@ def test_all_item_search_shapes_hide_contaminated_rows(contaminated_items: Path)
 
 - [ ] **Step 3: Confirm RED**
 
-Run:
-
 ```bash
 python -m pytest -q tests/test_item_registlet_filter.py
 ```
 
-Expected: FAIL because ids 90/91 are currently visible.
+Expected: FAIL because the helper is missing and contaminated rows are visible.
 
-- [ ] **Step 4: Add the canonical type helper**
+- [ ] **Step 4: Add the canonical item-type helper**
 
-In `toram_search/items/aliases.py` add:
+In `toram_search/items/aliases.py`:
 
 ```python
 REGISTLET_ITEM_TYPES = frozenset({'regislet', 'registlet'})
@@ -138,9 +143,9 @@ def is_registlet_item_type(item_type: str | None) -> bool:
     return str(item_type or '').strip().casefold() in REGISTLET_ITEM_TYPES
 ```
 
-- [ ] **Step 5: Centralize the SQL visibility predicate**
+- [ ] **Step 5: Centralize repository filtering**
 
-In `toram_search/items/repository.py` add a fixed internal helper:
+In `toram_search/items/repository.py`, import `is_registlet_item_type` and add:
 
 ```python
 _VISIBLE_ITEM_SQL = "LOWER(TRIM(COALESCE({column}, ''))) NOT IN ('regislet', 'registlet')"
@@ -150,13 +155,13 @@ def _visible_item_sql(column: str) -> str:
     return _VISIBLE_ITEM_SQL.format(column=column)
 ```
 
-Only call it with hard-coded identifiers such as `item_type` or `i.item_type`.
+Call `_visible_item_sql()` only with hard-coded repository identifiers such as `item_type` and `i.item_type`.
 
-Apply it to `list_items`, `list_item_types`, `list_stat_names`, `count_items_total`, `count_items_by_types`, `count_items_with_stat`, `_summary`, `get_upgrade_successors`, `get_item`, and `search_stat`.
+Apply the predicate to `list_items`, `list_item_types`, `list_stat_names`, `count_items_total`, `count_items_by_types`, `count_items_with_stat`, `_summary`, `get_upgrade_successors`, `get_item`, and `search_stat`. Keep `search_expression()` based on `list_items()` so it inherits the invariant.
 
-`search_expression()` must continue to start from `list_items()` so it inherits the invariant.
+Use `is_registlet_item_type()` for any Python-side item-type check rather than duplicating case/whitespace normalization.
 
-Change predecessor handling from a placeholder summary to omission:
+Change predecessor resolution to omit excluded summaries:
 
 ```python
 summary = self._summary(pid)
@@ -164,7 +169,7 @@ if summary is not None:
     rows.append(summary)
 ```
 
-For `get_upgrade_successors(item_id)`, first reject an excluded/missing source id:
+Before finding successors, reject an excluded/missing source id:
 
 ```python
 if self._summary(item_id) is None:
@@ -173,17 +178,15 @@ if self._summary(item_id) is None:
 
 - [ ] **Step 6: Confirm GREEN for repository/service behavior**
 
-Run:
-
 ```bash
 python -m pytest -q tests/test_item_registlet_filter.py tests/test_item_search.py
 ```
 
 Expected: PASS.
 
-- [ ] **Step 7: Add autocomplete and Universal source-authority tests**
+- [ ] **Step 7: Add autocomplete and source-authority integration tests**
 
-Extend `tests/test_item_registlet_filter.py` with JSON fixture coverage:
+Extend `tests/test_item_registlet_filter.py`:
 
 ```python
 import json
@@ -222,7 +225,7 @@ def test_item_autocomplete_excludes_contaminated_names(contaminated_items: Path,
     assert not any('regislet item' in row.value.casefold() or 'registlet item' in row.value.casefold() for row in suggestions)
 
 
-def test_same_name_uses_json_registlet_and_never_item_row(contaminated_items: Path, tmp_path: Path) -> None:
+def test_same_name_displays_json_registlet_not_item_row(contaminated_items: Path, tmp_path: Path) -> None:
     registlets = make_registlet_json(tmp_path / 'registlets.json')
     outcome = search_database(
         'Universal', 'Pierce Regislet Item',
@@ -265,7 +268,7 @@ git commit -m "fix: exclude Registlet rows from Item domain"
 
 ---
 
-### Task 2: Add Registlet match metadata without changing routing
+### Task 2: Add Registlet match metadata without changing search semantics
 
 **Files:**
 - Modify: `toram_search/registlets/models.py`
@@ -279,7 +282,7 @@ git commit -m "fix: exclude Registlet rows from Item domain"
 - Produces: `RegistletMatch(kind: RegistletMatchKind, detail: str | None = None)`
 - Produces: `RegistletSearchOutcome.match: RegistletMatch | None`
 
-- [ ] **Step 1: Write failing match-reason tests**
+- [ ] **Step 1: Write failing match metadata tests**
 
 Add to `tests/test_registlet_search.py`:
 
@@ -296,7 +299,26 @@ def test_success_routes_expose_match_metadata(registlet_file: Path) -> None:
     assert (fuzzy.match.kind, fuzzy.match.detail) == ('fuzzy_name', None)
 ```
 
-Also add a suppression test to `tests/test_universal_domains.py` that creates a successful Registlet effect route which loses to a stronger exact domain and asserts `outcome.registlets.match is None` after suppression.
+Add this concrete suppression unit test to `tests/test_universal_domains.py`:
+
+```python
+from toram_search.interpretation import RouteQuality
+from toram_search.registlets.models import RegistletMatch, RegistletSearchOutcome
+from toram_search.router import _suppress_outcome
+
+
+def test_suppressed_registlet_outcome_clears_match_metadata() -> None:
+    raw = RegistletSearchOutcome(
+        kind='results',
+        query='physical pierce',
+        results=(),
+        route_quality=RouteQuality('content', True, 2),
+        match=RegistletMatch('effect', 'physical pierce'),
+    )
+    suppressed = _suppress_outcome('Registlets', raw)
+    assert suppressed.match is None
+    assert suppressed.route_quality == raw.route_quality
+```
 
 - [ ] **Step 2: Confirm RED**
 
@@ -304,7 +326,7 @@ Also add a suppression test to `tests/test_universal_domains.py` that creates a 
 python -m pytest -q tests/test_registlet_search.py tests/test_universal_domains.py
 ```
 
-Expected: FAIL because `RegistletSearchOutcome` has no `match` field.
+Expected: FAIL because `RegistletMatch` and `RegistletSearchOutcome.match` do not exist.
 
 - [ ] **Step 3: Add immutable match types**
 
@@ -328,7 +350,7 @@ match: RegistletMatch | None = None
 
 - [ ] **Step 4: Populate metadata on successful routes only**
 
-In `toram_search/registlets/service.py`:
+In `toram_search/registlets/service.py` import `RegistletMatch` and add:
 
 ```python
 # Stoodie results
@@ -340,15 +362,15 @@ match=RegistletMatch('name')
 # effect results
 match=RegistletMatch('effect', _normalize_effect(raw))
 
-# fuzzy name results
+# fuzzy-name results
 match=RegistletMatch('fuzzy_name')
 ```
 
-Do not change route quality, thresholds, result ordering, or effect matching.
+Do not change route quality, thresholds, ordering, or effect matching.
 
-- [ ] **Step 5: Clear stale match metadata when Universal suppresses Registlets**
+- [ ] **Step 5: Clear stale metadata on suppressed Universal Registlet outcomes**
 
-In `toram_search/router.py`, keep generic suppression but add the Registlet-only metadata reset:
+In `toram_search/router.py`:
 
 ```python
 if domain == 'Items':
@@ -357,8 +379,6 @@ if domain == 'Registlets':
     return replace(outcome, match=None, **common)
 return replace(outcome, **common)
 ```
-
-This is not contamination filtering; it only prevents hidden results from retaining a misleading match reason.
 
 - [ ] **Step 6: Confirm GREEN**
 
@@ -377,7 +397,7 @@ git commit -m "feat: expose Registlet match reasons"
 
 ---
 
-### Task 3: Render match reasons and compact Stoodie badges
+### Task 3: Render Registlet match reasons and Stoodie badges
 
 **Files:**
 - Modify: `ui/registlet_cards.py`
@@ -410,9 +430,9 @@ def test_registlet_results_pass_outcome_match_to_cards() -> None:
 python -m pytest -q tests/test_ui_contract.py
 ```
 
-Expected: FAIL because cards currently render no match reason and a plain source-level text line.
+Expected: FAIL because cards currently have no match label and render source levels as one plain text line.
 
-- [ ] **Step 3: Add a pure label formatter**
+- [ ] **Step 3: Add a pure match-label formatter**
 
 In `ui/registlet_cards.py`:
 
@@ -429,7 +449,7 @@ def _match_label(match: RegistletMatch | None) -> str | None:
     return 'Matched by fuzzy name'
 ```
 
-- [ ] **Step 4: Render the approved card hierarchy**
+- [ ] **Step 4: Render the approved hierarchy**
 
 ```python
 def _render_registlet_card(record: RegistletRecord, match: RegistletMatch | None) -> None:
@@ -446,7 +466,7 @@ def _render_registlet_card(record: RegistletRecord, match: RegistletMatch | None
         st.write('**Affected Skills:** ' + ', '.join(record.affects_skill))
 ```
 
-Change `render_registlet_cards()` to accept `match` and pass it to each visible card. In `ui/results.py` call:
+Update `render_registlet_cards()` to accept `match` and pass it to each card. In `ui/results.py`:
 
 ```python
 render_registlet_cards(outcome.results, limit=limit, match=outcome.match)
@@ -469,19 +489,21 @@ git commit -m "feat: clarify Registlet result matches"
 
 ---
 
-### Task 4: Simplify suggested searches and put syntax guidance near the input
+### Task 4: Reduce suggestion crowding and add near-input guidance
 
 **Files:**
 - Modify: `main.py`
 - Modify: `ui/sidebar.py`
 - Modify: `tests/test_ui_contract.py`
-- Modify: `tests/test_app_shell.py` only if an existing exact example-count assertion requires it.
+- Modify: `tests/test_app_shell.py`
 
 **Interfaces:**
 - Preserves the existing fill-only example flow.
-- Produces exactly three Universal examples and at most three examples in each domain mode.
+- Produces exactly three Universal examples and no more than three examples in each domain mode.
 
-- [ ] **Step 1: Write failing UX contract tests**
+- [ ] **Step 1: Write failing source-level UX tests**
+
+Add to `tests/test_ui_contract.py`:
 
 ```python
 def test_suggested_search_density_is_small_and_static() -> None:
@@ -506,17 +528,15 @@ def test_help_names_registlet_json_as_source_of_truth() -> None:
     assert 'not the Item database' in source
 ```
 
-Keep `test_examples_are_fill_only_not_query_submissions()` unchanged.
-
 - [ ] **Step 2: Confirm RED**
 
 ```bash
 python -m pytest -q tests/test_ui_contract.py tests/test_app_shell.py
 ```
 
-Expected: FAIL because current Universal has five examples, domain modes have four, no near-input hint exists, and Help does not name the JSON source.
+Expected: FAIL because current example sets are larger and the syntax/source-authority text is missing.
 
-- [ ] **Step 3: Replace examples with the approved static sets**
+- [ ] **Step 3: Replace example tuples with the approved static sets**
 
 In `main.py`:
 
@@ -530,9 +550,22 @@ examples={
 }[mode]
 ```
 
-Do not alter the existing fill-only handler.
+Keep the existing fill-only state update unchanged.
 
-- [ ] **Step 4: Add compact mode-aware hints directly before the search box**
+Because `Guardian` is no longer a Universal example, update `test_example_button_fills_query_without_searching()` in `tests/test_app_shell.py` to use a retained example:
+
+```python
+def test_example_button_fills_query_without_searching() -> None:
+    app = AppTest.from_file(APP_PATH).run(timeout=10)
+    target = next(button for button in app.button if button.label == 'critical rate')
+    target.click().run(timeout=10)
+    assert app.session_state['query'] == 'critical rate'
+    assert app.session_state['last_outcome'] is None
+```
+
+Keep `test_food_example_fills_query_without_submitting()` unchanged.
+
+- [ ] **Step 4: Add compact mode-aware hints before the search box**
 
 ```python
 syntax_hints={
@@ -547,7 +580,7 @@ st.caption(syntax_hints[mode])
 
 - [ ] **Step 5: Clarify Search Help**
 
-Add to the Registlet help section in `ui/sidebar.py`:
+Add to the Registlet section of `ui/sidebar.py`:
 
 ```text
 Registlet results come from `registlets.json`, not the Item database.
@@ -559,7 +592,7 @@ Registlet results come from `registlets.json`, not the Item database.
 python -m pytest -q tests/test_ui_contract.py tests/test_app_shell.py
 ```
 
-Expected: PASS.
+Expected: PASS, including fill-only example behavior.
 
 - [ ] **Step 7: Commit Task 4**
 
@@ -575,13 +608,15 @@ git commit -m "feat: simplify search guidance"
 **Files:**
 - Modify: `tests/test_ui_contract.py`
 - Modify: `tests/test_real_databases.py`
-- Modify: `ui/food_cards.py` only if the acceptance test exposes a real gap.
+- Modify: `ui/food_cards.py` only if the acceptance regression below fails because the renderer lacks the approved behavior.
 
 **Interfaces:**
-- Consumes: current `render_food_cards()` grouping and code-block rendering.
-- Produces: final evidence that committed Registlet rows cannot leak through Items and source data remains untouched.
+- Consumes: current `render_food_cards()` level grouping and `st.code` rendering.
+- Produces: final evidence that committed Registlet rows cannot leak through Items and data files remain untouched.
 
-- [ ] **Step 1: Lock the existing Food behavior with a regression**
+- [ ] **Step 1: Lock the existing Food presentation**
+
+Add to `tests/test_ui_contract.py`:
 
 ```python
 def test_food_cards_keep_highest_level_grouping_and_code_copy_affordance() -> None:
@@ -590,11 +625,11 @@ def test_food_cards_keep_highest_level_grouping_and_code_copy_affordance() -> No
     assert 'st.code(code, language=None)' in source
 ```
 
-This is an acceptance lock, not a forced rewrite. If it passes immediately, leave `ui/food_cards.py` unchanged.
+If this passes immediately, do not edit `ui/food_cards.py`.
 
 - [ ] **Step 2: Add real-source regressions**
 
-In `tests/test_real_databases.py` add:
+In `tests/test_real_databases.py` add imports as needed and these tests:
 
 ```python
 from toram_search.database import REGISTLET_DATA
@@ -635,18 +670,18 @@ python -m pytest -q tests/test_ui_contract.py tests/test_real_databases.py
 
 Expected: PASS after Tasks 1–4.
 
-- [ ] **Step 4: Run the full verification commands**
+- [ ] **Step 4: Run full verification**
 
 ```bash
 python -m pytest -q
 python -m compileall -q main.py toram_search ui
 ```
 
-Expected: zero test failures and compile exit code 0.
+Expected: zero failures and compile exit code 0.
 
-- [ ] **Step 5: Verify the five protected data blobs**
+- [ ] **Step 5: Verify protected data blobs**
 
-Compare branch vs. base SHA for:
+Compare the implementation branch against its base for:
 
 ```text
 items.sqlite
@@ -656,7 +691,7 @@ food_stat_aliases.json
 registlets.json
 ```
 
-Expected: identical blob SHA for every file.
+Expected: identical blob SHA for all five.
 
 - [ ] **Step 6: Commit Task 5**
 
@@ -665,23 +700,19 @@ git add tests/test_ui_contract.py tests/test_real_databases.py
 git commit -m "test: lock Registlet source authority UX"
 ```
 
-If `ui/food_cards.py` genuinely required a fix, include that file and describe the specific failing acceptance behavior in the commit body.
+If `ui/food_cards.py` required a real fix, include it in this commit and describe the failing acceptance behavior in the commit body.
 
 ---
 
 ## Final Review Checklist
 
 - [ ] Both contaminated item-type spellings are excluded with case/whitespace normalization.
-- [ ] Item list/type/stat vocabulary and every Item count ignore contaminated rows.
-- [ ] Exact/fuzzy/stat/structured Item search ignores contaminated rows.
-- [ ] Item autocomplete ignores contaminated names.
-- [ ] Direct Item detail access raises `KeyError` for contaminated ids.
-- [ ] Upgrade relationships omit contaminated rows and excluded source ids yield no successors.
+- [ ] Item lists, vocabularies, counts, all search paths, autocomplete, detail access, and upgrades ignore contaminated rows.
 - [ ] Missing `registlets.json` never reactivates contaminated Item rows.
 - [ ] Same-name Item/JSON data displays only the JSON Registlet record.
 - [ ] Registlet match metadata is correct for Stoodie, exact name, effect, and fuzzy name.
 - [ ] Suppressed Universal Registlet outcomes clear stale match metadata.
-- [ ] Registlet cards show match reason, max level, unchanged effect text, Stoodie badges, and affected Skills.
+- [ ] Registlet cards show match reason, max level, unchanged effect, discrete Stoodie badges, and affected Skills.
 - [ ] Food remains highest-level-first and keeps its code-copy affordance.
 - [ ] Universal has exactly three visible examples and every mode has at most three.
 - [ ] Example buttons remain fill-only.
