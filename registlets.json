@@ -1,0 +1,2592 @@
+{
+  "metadata": {
+    "record_count": 153,
+    "source": "user_provided_registlet_list",
+    "stoodie_location": "El Scaro",
+    "valid_stoodie_levels": [
+      10,
+      30,
+      50,
+      70,
+      90,
+      110,
+      130,
+      150,
+      170,
+      190,
+      210,
+      220,
+      230,
+      250,
+      270
+    ],
+    "stoodie_notation_rules": {
+      "range": "A-B means every valid Stoodie level from A through B, inclusive.",
+      "separate": "A & B (or comma-separated values) means the listed levels only."
+    },
+    "field_notes": {
+      "affects_skill": "Not explicitly provided in the supplied list, so it is left null rather than inferred from effect text."
+    }
+  },
+  "registlets": [
+    {
+      "name": "Accuracy Boost",
+      "max_lv": 10,
+      "effect": "Increases accuracy by 1 per regislet level.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "10-270",
+        "levels": [
+          10,
+          30,
+          50,
+          70,
+          90,
+          110,
+          130,
+          150,
+          170,
+          190,
+          210,
+          220,
+          230,
+          250,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Arrow Rain Enhancer",
+      "max_lv": 2,
+      "effect": "An additional attack is added to the skill \"Arrow Rain\" (+1 hit per level)",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "70-150 & 220",
+        "levels": [
+          70,
+          90,
+          110,
+          130,
+          150,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Assassin Stab Enhancer",
+      "max_lv": 10,
+      "effect": "Raises the power of \"Assassin Stab\" by (1% per level)%. Furthermore, the accuracy is raised by (10 × level)% if it is Back Stab.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "210 & 230",
+        "levels": [
+          210,
+          230
+        ]
+      }
+    },
+    {
+      "name": "Attack Speed Boost",
+      "max_lv": 100,
+      "effect": "Increases ASPD by 1 per regislet level.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "10-270",
+        "levels": [
+          10,
+          30,
+          50,
+          70,
+          90,
+          110,
+          130,
+          150,
+          170,
+          190,
+          210,
+          220,
+          230,
+          250,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Attacker's Pet",
+      "max_lv": 10,
+      "effect": "Raises the damage dealt by pet by 3% per registlet level, but greatly decreases its owner's damage.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "110 & 250",
+        "levels": [
+          110,
+          250
+        ]
+      }
+    },
+    {
+      "name": "Aura Blade Force",
+      "max_lv": 8,
+      "effect": "Releases a shock wave (single target attack). Dealing 10(+10 per regislet level)% damage if the monster targeted by \"Aura Blade\" is out of range.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "250",
+        "levels": [
+          250
+        ]
+      }
+    },
+    {
+      "name": "Berserk Control",
+      "max_lv": 1,
+      "effect": "For each level of \"Berserk\", 10% chance to prevent \"Rampage\" from being cancelled",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "170, 190 & 210",
+        "levels": [
+          170,
+          190,
+          210
+        ]
+      }
+    },
+    {
+      "name": "Berserk Rush",
+      "max_lv": 5,
+      "effect": "Reduces the negative effect of \"Berserk\" by (1 × regislet level)% if you take damage from a monster while the skill is active.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "270",
+        "levels": [
+          270
+        ]
+      }
+    },
+    {
+      "name": "Binding Strike Modifier",
+      "max_lv": 1,
+      "effect": "Modifies \"Binding Strike\" so that it inflicts [Stun] to the target only and the [Stop] effect is removed.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "210 & 220",
+        "levels": [
+          210,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Bloody Bite Enhancer",
+      "max_lv": 10,
+      "effect": "Raises the power of \"Bloody Bite\" by 10% × Registlet Level.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "170, 190 & 210",
+        "levels": [
+          170,
+          190,
+          210
+        ]
+      }
+    },
+    {
+      "name": "Bloody Warrior",
+      "max_lv": 20,
+      "effect": "Raises normal attack power and Attack MP Recovery by (5% × Registlet Level) while afflicted with Bleed.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "150 & 270",
+        "levels": [
+          150,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Blue Zone Shield",
+      "max_lv": 10,
+      "effect": "Reduces the damage from monster attacks shown with a blue warning by 1(+1 per Regislet Level)%. However, damage taken from single-target attacks increases by 10%(disadvantage). This damage reduction applies multiplicatively with other damage reductions such as Refinement, Resistance",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "270",
+        "levels": [
+          270
+        ]
+      }
+    },
+    {
+      "name": "Bullseye Enhancer",
+      "max_lv": 20,
+      "effect": "Raises the power of \"Bullseye\" by (5% × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "30-130",
+        "levels": [
+          30,
+          50,
+          70,
+          90,
+          110,
+          130
+        ]
+      }
+    },
+    {
+      "name": "Burning Spirit",
+      "max_lv": 10,
+      "effect": "Restores MP as much as (5 × Registlet Level)% of your Attack MP Recovery when taking damage inflicted by Ignite.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "150 & 230",
+        "levels": [
+          150,
+          230
+        ]
+      }
+    },
+    {
+      "name": "Cannon Spear Enhancer",
+      "max_lv": 10,
+      "effect": "Adds a (10% × Registlet Level) chance of inflicting \"Flinch\" to the first attack of the skill \"Cannon Spear\".",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "30-130",
+        "levels": [
+          30,
+          50,
+          70,
+          90,
+          110,
+          130
+        ]
+      }
+    },
+    {
+      "name": "Cat's Eye",
+      "max_lv": 1,
+      "effect": "A MISS hit while you are Blind may be turned into a GRAZE hit when possible.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "30-70 & 220",
+        "levels": [
+          30,
+          50,
+          70,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Chancy Trap",
+      "max_lv": 1,
+      "effect": "Enables a trap skill to be set at the target's feet, but if it activates immediately, you will also be affected.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "210 & 220",
+        "levels": [
+          210,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Check Out Notice",
+      "max_lv": 1,
+      "effect": "When you get knocked out, you will declare it through Party Chat. If it is a Guild RAID, you will declare it through Say Chat.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "230",
+        "levels": [
+          230
+        ]
+      }
+    },
+    {
+      "name": "Coffee Break",
+      "max_lv": 10,
+      "effect": "Restores 10% of your HP when you defeat a monster. Cooldown: (30 - Registlet Level) seconds.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "130 & 230",
+        "levels": [
+          130,
+          230
+        ]
+      }
+    },
+    {
+      "name": "Comrade Familia",
+      "max_lv": 1,
+      "effect": "The chance of the familiar summoned with \"Familia\" fleeing is reduced by 1%. Movement becomes 1 second faster for Advanced Familiar.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "190, 220 & 250",
+        "levels": [
+          190,
+          220,
+          250
+        ]
+      }
+    },
+    {
+      "name": "Critical Charging Slash",
+      "max_lv": 10,
+      "effect": "Lowers the power of \"Charging Slash\" by [110 - (10 × Registlet Level)]% and guarantees a critical hit.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "70-150",
+        "levels": [
+          70,
+          90,
+          110,
+          130,
+          150
+        ]
+      }
+    },
+    {
+      "name": "Cross Parry Enhancer",
+      "max_lv": 20,
+      "effect": "Raises the power of \"Cross Parry\" by (5% × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "30-130",
+        "levels": [
+          30,
+          50,
+          70,
+          90,
+          110,
+          130
+        ]
+      }
+    },
+    {
+      "name": "Damage Check",
+      "max_lv": 1,
+      "effect": "Displays an additional warning message when stepping on a warning area if the damage from the attack exceeds 50% of your current HP.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "250",
+        "levels": [
+          250
+        ]
+      }
+    },
+    {
+      "name": "Dark Talent",
+      "max_lv": 1,
+      "effect": "Sets skill effects that change based on element to dark element.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "250",
+        "levels": [
+          250
+        ]
+      }
+    },
+    {
+      "name": "Decoy Shot Compress",
+      "max_lv": 10,
+      "effect": "Halves the duration of \"Decoy Shot\" but increases the power by (10% × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "170-210",
+        "levels": [
+          170,
+          190,
+          210
+        ]
+      }
+    },
+    {
+      "name": "Direct Sonic Thrust",
+      "max_lv": 1,
+      "effect": "The skill \"Sonic Thrust\" loses its swift effect, but gains an effect that ignores Evasion in return.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "230",
+        "levels": [
+          230
+        ]
+      }
+    },
+    {
+      "name": "Distant Buster Lance",
+      "max_lv": 10,
+      "effect": "Increases the power of \"Buster Lance\" by (10% per Regislet Level). The range and distance at which the power starts to weaken is Increased, making it always a long-range attack.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "250",
+        "levels": [
+          250
+        ]
+      }
+    },
+    {
+      "name": "Distinct Parabola Cannon",
+      "max_lv": 1,
+      "effect": "The skill \"Parabola Cannon\" now only hits monsters currently in combat and guarantees a critical hit.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "270",
+        "levels": [
+          270
+        ]
+      }
+    },
+    {
+      "name": "Dodge",
+      "max_lv": 10,
+      "effect": "Increases Dodge by (1 per Regislet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "10-270",
+        "levels": [
+          10,
+          30,
+          50,
+          70,
+          90,
+          110,
+          130,
+          150,
+          170,
+          190,
+          210,
+          220,
+          230,
+          250,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Dominant War Cry",
+      "max_lv": 1,
+      "effect": "Activation of \"War Cry\" will not be interrupted by Fear.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "170-220",
+        "levels": [
+          170,
+          190,
+          210,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Dragon Fire Release",
+      "max_lv": 10,
+      "effect": "The time to cast [Fire Release] is increased by 1 second, but the skill gains (2.5 × Regislet Level)% Magic Pierce. This increase in Magic Pierce doubles if [Blazing Explosion] is triggered.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "220 & 250",
+        "levels": [
+          220,
+          250
+        ]
+      }
+    },
+    {
+      "name": "Dragon Tail Enhancer",
+      "max_lv": 20,
+      "effect": "Raises the power of the second hit of \"Dragon Tail\" by (5% × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "70-150",
+        "levels": [
+          70,
+          90,
+          110,
+          130,
+          150
+        ]
+      }
+    },
+    {
+      "name": "Eagle Eye",
+      "max_lv": 10,
+      "effect": "Reduces damage taken from behind (opposite camera direction) by 1% × Registlet Level. The damage will be further reduced when taken from directly behind.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "130 & 230",
+        "levels": [
+          130,
+          230
+        ]
+      }
+    },
+    {
+      "name": "Earth Talent",
+      "max_lv": 1,
+      "effect": "Sets skill effects that change based on element to Earth element.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "220",
+        "levels": [
+          220
+        ]
+      }
+    },
+    {
+      "name": "Earthbind Enhancer",
+      "max_lv": 10,
+      "effect": "Raises the power of \"Earthbind\" by (5% × Registlet Level) if used with knuckles.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "70-150",
+        "levels": [
+          70,
+          90,
+          110,
+          130,
+          150
+        ]
+      }
+    },
+    {
+      "name": "Elemental Trigger Slash",
+      "max_lv": 1,
+      "effect": "Converts the element of \"Trigger Slash\" from fire to that of the weapon equipped.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "70-130, 150 & 220",
+        "levels": [
+          70,
+          90,
+          110,
+          130,
+          150,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Elemergency Care",
+      "max_lv": 10,
+      "effect": "Reduces the MP Aggro triggered by \"First Aid\" by (1 × Regislet Level). Up to MP Cost 100 at the minimum.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "220 & 270",
+        "levels": [
+          220,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Elemergency HP Heal",
+      "max_lv": 10,
+      "effect": "Instantly restores (10 + Registlet Level)% of your HP when there is only 25% or less due to monster's attacks. Cooldown: 60 seconds.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "30, 150 & 270",
+        "levels": [
+          30,
+          150,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Elemergency MP Heal",
+      "max_lv": 10,
+      "effect": "Immediately restores (10 × Registlet Level) MP if there is not enough MP. Cooldown: 60 seconds.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "50, 150 & 270",
+        "levels": [
+          50,
+          150,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Elemergency Repair",
+      "max_lv": 20,
+      "effect": "There is a (5 × Registlet Level)% chance of having Armor Break status removed when the damage taken increases because of it.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "130 & 250",
+        "levels": [
+          130,
+          250
+        ]
+      }
+    },
+    {
+      "name": "Exclusive Bodyguard",
+      "max_lv": 10,
+      "effect": "Reduces the Physical/Magic/Fractional damage received by the mercenary or partner summoned as a \"Defender\" by (3 × Regislet Level)%.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "270",
+        "levels": [
+          270
+        ]
+      }
+    },
+    {
+      "name": "Express Assault Attack",
+      "max_lv": 10,
+      "effect": "Removes [Knock Back] and [Slow] from \"Assault Attack\" and increases its power by (10% × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "250",
+        "levels": [
+          250
+        ]
+      }
+    },
+    {
+      "name": "Extra Recovery",
+      "max_lv": 5,
+      "effect": "Adds a HP recovery effect to the skill \"Recovery\". The amount of HP restored is (10 × Registlet Level)% of the HP recovered by the Mini Heal learned.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "170-220",
+        "levels": [
+          170,
+          190,
+          210,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Extreme Chronos Shift",
+      "max_lv": 5,
+      "effect": "\"Chronos Shift\" can be activated even if there is not enough MP by consuming HP. 60(-10% per Regislet Level)% HP is required per 100 MP you're short of. This HP consumption could get you knocked out.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "220-230",
+        "levels": [
+          220,
+          230
+        ]
+      }
+    },
+    {
+      "name": "Extreme Concentrate",
+      "max_lv": 5,
+      "effect": "Increases the activation rate of \"Concentrate\" by 1% per Registlet Level.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "170-210",
+        "levels": [
+          170,
+          190,
+          210
+        ]
+      }
+    },
+    {
+      "name": "Extreme Whack",
+      "max_lv": 5,
+      "effect": "Increases the activation rate of \"Whack\" by 1% per Registlet Level.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "170-220",
+        "levels": [
+          170,
+          190,
+          210,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Fighter's Magic: Impact",
+      "max_lv": 1,
+      "effect": "Changes the proration dealt by [Magic: Impact] to physical proration.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "220 & 250",
+        "levels": [
+          220,
+          250
+        ]
+      }
+    },
+    {
+      "name": "Final Resistance",
+      "max_lv": 5,
+      "effect": "If you get knocked out last in the party, you will squeeze out every last bit of your strength to quickly revive for (5 + Registlet Level) seconds before becoming unable to battle again.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "50, 170, 220 & 270",
+        "levels": [
+          50,
+          170,
+          220,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Final Talent",
+      "max_lv": 1,
+      "effect": "Sets skill effects that change based on element to Fire element.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "220",
+        "levels": [
+          220
+        ]
+      }
+    },
+    {
+      "name": "Flash Stab Enhancer",
+      "max_lv": 20,
+      "effect": "Raises the power of \"Flash Stab\" by (5% × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "30-130",
+        "levels": [
+          30,
+          50,
+          70,
+          90,
+          110,
+          130
+        ]
+      }
+    },
+    {
+      "name": "Focus Demon Claw",
+      "max_lv": 1,
+      "effect": "The power of \"Demon Claw\" is reduced by 100% but the skill will focus on attacking a single target.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "210-220",
+        "levels": [
+          210,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Focus Dive Impact",
+      "max_lv": 5,
+      "effect": "Turns the skill \"Dive Impact\" into an attack that pierces through a single target. Resistance to Dazzled is shortened by (2 seconds × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "150-220 & 250",
+        "levels": [
+          150,
+          170,
+          190,
+          210,
+          220,
+          250
+        ]
+      }
+    },
+    {
+      "name": "Focus Resonance",
+      "max_lv": 9,
+      "effect": "\"Resonance\" will only enhance stats that affect concentration and precision, but the enhancement is reduced by [95 - (5 × Registlet Level)]%.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "210 & 270",
+        "levels": [
+          210,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Forty Winks",
+      "max_lv": 5,
+      "effect": "Shortens Sleep duration by (10% × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "90 & 220",
+        "levels": [
+          90,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Frugal Breathwork",
+      "max_lv": 1,
+      "effect": "Reduces the MP Cost of [Breathwork] by",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "220 & 270",
+        "levels": [
+          220,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Frugal Heal",
+      "max_lv": 1,
+      "effect": "Reduces the MP Cost of the skill \"Heal\" by",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "170-220",
+        "levels": [
+          170,
+          190,
+          210,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Frugal Shield Bash",
+      "max_lv": 10,
+      "effect": "Restores (10 × Registlet Level) MP when \"Shield Bash\" inflicts [Stun].",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "170, 190, 230 & 270",
+        "levels": [
+          170,
+          190,
+          230,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Full Power Qi Charge",
+      "max_lv": 10,
+      "effect": "When \"Qi Charge\" gives no effect, qi will increase by (10 × Registlet Level)% if the skill is activated using 2000 MP.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "170 & 230",
+        "levels": [
+          170,
+          230
+        ]
+      }
+    },
+    {
+      "name": "Guitarist",
+      "max_lv": 6,
+      "effect": "Allows smooth song resumption with Ad-lib. A successful Parry with Ad-lib grants [Regislet Level] stack(s) of Beat Blast.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "210-220 & 250",
+        "levels": [
+          210,
+          220,
+          250
+        ]
+      }
+    },
+    {
+      "name": "Hard Hit Enhancer",
+      "max_lv": 20,
+      "effect": "Raises the power of \"Hard Hit\" by (5% × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "30-130",
+        "levels": [
+          30,
+          50,
+          70,
+          90,
+          110,
+          130
+        ]
+      }
+    },
+    {
+      "name": "Heal Bank",
+      "max_lv": 10,
+      "effect": "The amount of HP recovered by \"Mini Heal\" and \"Heal\" is halved. Accumulates up to [Registlet Level] stacks of buff every 3 sec. When using the skill to heal an ally, the buff is consumed instead of MP to activate it.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "210 & 230",
+        "levels": [
+          210,
+          230
+        ]
+      }
+    },
+    {
+      "name": "Heal Hands",
+      "max_lv": 10,
+      "effect": "Alleviates the reduced recovery of Heal-related Regislets by (10% per Regislet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "230",
+        "levels": [
+          230
+        ]
+      }
+    },
+    {
+      "name": "Holy Light Retribution",
+      "max_lv": 10,
+      "effect": "There is a 1% chance that Lv[Registlet Level] light element Magic: Finale will activate when \"Holy Light\" hits the target.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "210 & 250",
+        "levels": [
+          210,
+          250
+        ]
+      }
+    },
+    {
+      "name": "Impetus",
+      "max_lv": 10,
+      "effect": "Reduces movement speed decline due to Slow by (5% × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "110-130 & 270",
+        "levels": [
+          110,
+          130,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Instuctor",
+      "max_lv": 10,
+      "effect": "Sets your own EXP Gain to 0 to increase the EXP Gain of the party member with the lowest level by 1% per Regislet Level. Less effective if there are multiple recipients.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "230",
+        "levels": [
+          230
+        ]
+      }
+    },
+    {
+      "name": "Invincible Dauntless",
+      "max_lv": 3,
+      "effect": "\"Dauntless\" accumulates 1 second faster, but the count will decrease by 9(- 3 per Regislet Level) when taking damage. However, it won't decrease if the damage is blocked with Guard or certain Mononofu skills.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "250",
+        "levels": [
+          250
+        ]
+      }
+    },
+    {
+      "name": "Iron Fist",
+      "max_lv": 5,
+      "effect": "Guard Break increases by (1% per Regislet Level) when barehanded or equipping knuckles (main only). The amount increased will be tripled if sub-weapon is empty.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "230",
+        "levels": [
+          230
+        ]
+      }
+    },
+    {
+      "name": "Ironhearted Chronos Drive",
+      "max_lv": 1,
+      "effect": "Changes the additional attack effect of \"Chronos Drive\" from magic attack (based on INT) to physical attack (based on STR).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "270",
+        "levels": [
+          270
+        ]
+      }
+    },
+    {
+      "name": "Issen Enhancer",
+      "max_lv": 20,
+      "effect": "Raises the power of the second hit of \"Issen\" by (5% × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "30-130",
+        "levels": [
+          30,
+          50,
+          70,
+          90,
+          110,
+          130
+        ]
+      }
+    },
+    {
+      "name": "Knight's Intuition",
+      "max_lv": 5,
+      "effect": "Anticipate increases by 5% if a one-handed sword is equipped, equipping a shield will triple the amount increased.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "250",
+        "levels": [
+          250
+        ]
+      }
+    },
+    {
+      "name": "Last Hero",
+      "max_lv": 10,
+      "effect": "Restores (10 + Registlet Level)% of your HP and MP per knocked out party member when you are the only one left. Cooldown: 300 seconds.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "90 & 190",
+        "levels": [
+          90,
+          190
+        ]
+      }
+    },
+    {
+      "name": "Light Talent",
+      "max_lv": 1,
+      "effect": "Sets skill effects that change based on element to light element.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "230",
+        "levels": [
+          230
+        ]
+      }
+    },
+    {
+      "name": "Lunar Slash Absorber",
+      "max_lv": 10,
+      "effect": "All \"Lunar Slash\" stacks are now consumed and MP is restored based on the number of stacks consumed. MP recovery amount is 1 MP × Regislet Level × Lunar Slash Stack Consumed. Lunar Slash stack additional damage is disabled when equipping this regislet.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "270",
+        "levels": [
+          270
+        ]
+      }
+    },
+    {
+      "name": "Magadachi Amulet",
+      "max_lv": 6,
+      "effect": "Raises magic damage reduction by the skill \"Magadachi\" by (5% × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "70-150 & 220",
+        "levels": [
+          70,
+          90,
+          110,
+          130,
+          150,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Magic Attack Boost",
+      "max_lv": 30,
+      "effect": "Increases MATK by (1 per Regislet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "10-270",
+        "levels": [
+          10,
+          30,
+          50,
+          70,
+          90,
+          110,
+          130,
+          150,
+          170,
+          190,
+          210,
+          220,
+          230,
+          250,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Magic Defense Boost",
+      "max_lv": 50,
+      "effect": "Increases MDEF by (1 per Regislet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "10-270",
+        "levels": [
+          10,
+          30,
+          50,
+          70,
+          90,
+          110,
+          130,
+          150,
+          170,
+          190,
+          210,
+          220,
+          230,
+          250,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Magic Speed Boost",
+      "max_lv": 100,
+      "effect": "Increases CSPD by (1 per Regislet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "10-270",
+        "levels": [
+          10,
+          30,
+          50,
+          70,
+          90,
+          110,
+          130,
+          150,
+          170,
+          190,
+          210,
+          220,
+          230,
+          250,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Magic: Arrows Enhancer",
+      "max_lv": 4,
+      "effect": "Adds 1 shot per Registlet Level to the skill \"Magic: Arrows\".",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "30-130 & 220",
+        "levels": [
+          30,
+          50,
+          70,
+          90,
+          110,
+          130,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Magic: Blast Catalyst",
+      "max_lv": 5,
+      "effect": "Shortens the time to cast the skill \"Magic: Blast\" by 0.2 seconds per Registlet Level.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "70-150 & 220",
+        "levels": [
+          70,
+          90,
+          110,
+          130,
+          150,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Magic: Lance Catalyst",
+      "max_lv": 5,
+      "effect": "Shortens the interval between shots of the skill \"Magic: Lances\" by 0.1 seconds per Registlet Level.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "70-150 & 220",
+        "levels": [
+          70,
+          90,
+          110,
+          130,
+          150,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Magic: Storm Extender",
+      "max_lv": 5,
+      "effect": "Lowers the power of \"Magic: Storm\" by 50% to make its effect last 1s(+1s per Regislet Level) longer.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "250",
+        "levels": [
+          250
+        ]
+      }
+    },
+    {
+      "name": "Magic: Wall Enhancer",
+      "max_lv": 20,
+      "effect": "Raises the power of \"Magic: Wall\" by (5% × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "30-130",
+        "levels": [
+          30,
+          50,
+          70,
+          90,
+          110,
+          130
+        ]
+      }
+    },
+    {
+      "name": "Magic Crystal Catalyst",
+      "max_lv": 5,
+      "effect": "Reduces the casting time of \"Mana Crystal\" by (10 × Registlet Level)%, but the amount of MP recovered gets reduced by",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "210-220 & 270",
+        "levels": [
+          210,
+          220,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Magic Defuser",
+      "max_lv": 1,
+      "effect": "Immediately restores 100 MP if you survive a Mana Explosion.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "130-150 & 220",
+        "levels": [
+          130,
+          150,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Magic Thrash",
+      "max_lv": 1,
+      "effect": "Raises normal attack power in exchange for Attack MP Recovery.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "110, 220 & 230",
+        "levels": [
+          110,
+          220,
+          230
+        ]
+      }
+    },
+    {
+      "name": "Max HP Boost",
+      "max_lv": 100,
+      "effect": "Increases HP by (10 × Regislet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "10-270",
+        "levels": [
+          10,
+          30,
+          50,
+          70,
+          90,
+          110,
+          130,
+          150,
+          170,
+          190,
+          210,
+          220,
+          230,
+          250,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Max MP Boost",
+      "max_lv": 100,
+      "effect": "Increases MP by (10 × Regislet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "10-270",
+        "levels": [
+          10,
+          30,
+          50,
+          70,
+          90,
+          110,
+          130,
+          150,
+          170,
+          190,
+          210,
+          220,
+          230,
+          250,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Maximizer Converter",
+      "max_lv": 1,
+      "effect": "Switches [Maximizer] to activate MP Charge instead when used alone.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "220",
+        "levels": [
+          220
+        ]
+      }
+    },
+    {
+      "name": "Mega Demon Wind Shuriken",
+      "max_lv": 2,
+      "effect": "MP Cost of [Demon Wind Shuriken] increases by [200 - (100 × Regislet Level)], but, in exchange, the number of times the shuriken can hit without reduced damage is increased by",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "220 & 270",
+        "levels": [
+          220,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Mega Royal Heal",
+      "max_lv": 8,
+      "effect": "The range of \"Royal Heal\" effect is increased by 1m per Registlet Level, but the amount of HP restores is halved.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "190 & 230",
+        "levels": [
+          190,
+          230
+        ]
+      }
+    },
+    {
+      "name": "Mega War Cry of Struggle",
+      "max_lv": 10,
+      "effect": "Increases the aggro generated by the skill \"War Cry of Struggle\" by (300 × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "70-150",
+        "levels": [
+          70,
+          90,
+          110,
+          130,
+          150
+        ]
+      }
+    },
+    {
+      "name": "Meikyo Shisui Preserver",
+      "max_lv": 1,
+      "effect": "The effect from \"Meikyo Shisui\" remains when using a skill.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "70-150 & 220",
+        "levels": [
+          70,
+          90,
+          110,
+          130,
+          150,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Meteor Magic: Crash",
+      "max_lv": 5,
+      "effect": "The meteorites from \"Magic: Crash\" become much smaller in size, but the time of impact is shortened by (0.1 × Regislet Level - 0.1) and all meteorites will drop down even when not hitting the target.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "230",
+        "levels": [
+          230
+        ]
+      }
+    },
+    {
+      "name": "Monophobia",
+      "max_lv": 5,
+      "effect": "Restores 100 HP per 10 seconds when near a party member, but when not, 100 HP will be lost. Range is (3 + Registlet Level) meters.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "90, 170, 220 & 270",
+        "levels": [
+          90,
+          170,
+          220,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Monster Hunter",
+      "max_lv": 10,
+      "effect": "Restores 100 MP when you defeat a monster. Cooldown: (30 - Registlet Level) seconds.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "150 & 250",
+        "levels": [
+          150,
+          250
+        ]
+      }
+    },
+    {
+      "name": "Neural Control",
+      "max_lv": 30,
+      "effect": "Reduces the amount of ASPD lowered due to Paralysis by (2% × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "50, 70 & 250",
+        "levels": [
+          50,
+          70,
+          250
+        ]
+      }
+    },
+    {
+      "name": "Panic",
+      "max_lv": 10,
+      "effect": "Restores (10 × Registlet Level) MP every 3 seconds, but all MP will be lost if you get aggro and this Registlet will be suspended for 30 seconds.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "150 & 230",
+        "levels": [
+          150,
+          230
+        ]
+      }
+    },
+    {
+      "name": "Paralysis Shot Extender",
+      "max_lv": 10,
+      "effect": "Extends the duration of buff from the skill \"Paralysis Shot\" by 1 second per Registlet Level.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "70-150",
+        "levels": [
+          70,
+          90,
+          110,
+          130,
+          150
+        ]
+      }
+    },
+    {
+      "name": "Parrier Storm Blaze",
+      "max_lv": 1,
+      "effect": "A Guard check is added to the skill \"Storm Blaze\". A successful Guard will double the amount of MP recovered.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "250",
+        "levels": [
+          250
+        ]
+      }
+    },
+    {
+      "name": "Parsimony",
+      "max_lv": 10,
+      "effect": "Instead of consuming a triggered auto-item, the item cooldown is doubled. Cooldown: (40 - Registlet Level) seconds.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "110 & 250",
+        "levels": [
+          110,
+          250
+        ]
+      }
+    },
+    {
+      "name": "Perfect Triple Thrust",
+      "max_lv": 10,
+      "effect": "Restores (10 × Regislet Level) MP if [Triple Thrust] is successfully activated without taking any damage when used alone.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "220 & 270",
+        "levels": [
+          220,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Phantom Slash Enhancer",
+      "max_lv": 20,
+      "effect": "Raises the power of \"Phantom Slash\" by (5% × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "150-210",
+        "levels": [
+          150,
+          170,
+          190,
+          210
+        ]
+      }
+    },
+    {
+      "name": "Physical Attack Boost",
+      "max_lv": 30,
+      "effect": "Increases ATK by (1 per Regislet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "10-270",
+        "levels": [
+          10,
+          30,
+          50,
+          70,
+          90,
+          110,
+          130,
+          150,
+          170,
+          190,
+          210,
+          220,
+          230,
+          250,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Physical Defense Boost",
+      "max_lv": 50,
+      "effect": "Increases DEF by (1 per Regislet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "10-270",
+        "levels": [
+          10,
+          30,
+          50,
+          70,
+          90,
+          110,
+          130,
+          150,
+          170,
+          190,
+          210,
+          220,
+          230,
+          250,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Piercing Heavy Smash",
+      "max_lv": 10,
+      "effect": "Adds (5 × Registlet Level)% Physical Pierce to the skill \"Heavy Smash\" if used with knuckles.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "150-210",
+        "levels": [
+          150,
+          170,
+          190,
+          210
+        ]
+      }
+    },
+    {
+      "name": "Posion Heal",
+      "max_lv": 30,
+      "effect": "(1% × Registlet Level) chance of having Poison status removed when taking damage inflicted by Poison.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "30-50 & 270",
+        "levels": [
+          30,
+          50,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Pommel Strike Enhancer",
+      "max_lv": 5,
+      "effect": "Extends the duration of Paralysis caused by the skill \"Pommel Strike\" by 1 second per Registlet Level.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "30-130 & 220",
+        "levels": [
+          30,
+          50,
+          70,
+          90,
+          110,
+          130,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Power Resonance",
+      "max_lv": 9,
+      "effect": "\"Resonance\" will only enhance stats that affect firepower, but the enhancement is reduced by [95 - (5 × Registlet Level)]%.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "170 & 230",
+        "levels": [
+          170,
+          230
+        ]
+      }
+    },
+    {
+      "name": "Power Shot Boost",
+      "max_lv": 20,
+      "effect": "Raises the power of \"Power Shot\" by (15% × Registlet Level) when Tumble is inflicted.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "30-130",
+        "levels": [
+          30,
+          50,
+          70,
+          90,
+          110,
+          130
+        ]
+      }
+    },
+    {
+      "name": "Power Wave Modifier",
+      "max_lv": 10,
+      "effect": "Modifies the effect of \"Power Wave\" so that it raises normal attack power by [(Registlet Level + Power Wave Level) × 0.5]% instead of extending the range.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "70-150",
+        "levels": [
+          70,
+          90,
+          110,
+          130,
+          150
+        ]
+      }
+    },
+    {
+      "name": "Protection Aegis",
+      "max_lv": 1,
+      "effect": "When [Protection] is activated, the [Aegis] you've acquired will also be activated at the same time. Likewise, when [Aegis] is activated, the [Protection] you've acquired will also be activated at the same time.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "220",
+        "levels": [
+          220
+        ]
+      }
+    },
+    {
+      "name": "Purifying Twin Buster Blade",
+      "max_lv": 3,
+      "effect": "The power of \"Twin Buster Blade\" now increases based on the number of debuffs (max 1 types × Regislet Level) on the target.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "270",
+        "levels": [
+          270
+        ]
+      }
+    },
+    {
+      "name": "Pursuit Relief",
+      "max_lv": 20,
+      "effect": "Reduces damage taken by (1% × Registlet Level) when you can't move while afflicted with Flinch, Tumble, or Stun.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "150 & 250",
+        "levels": [
+          150,
+          250
+        ]
+      }
+    },
+    {
+      "name": "Pyrexia",
+      "max_lv": 20,
+      "effect": "The chance of having Freeze status removed if you do a normal attack while frozen increases by (5% × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "110 & 230",
+        "levels": [
+          110,
+          230
+        ]
+      }
+    },
+    {
+      "name": "Rage Sword Enhancer",
+      "max_lv": 10,
+      "effect": "Raises the power of \"Rage Sword\" by 10% per Registlet Level. Aggro doubles if the target is hostile towards you.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "190 & 250",
+        "levels": [
+          190,
+          250
+        ]
+      }
+    },
+    {
+      "name": "Red Zone Shield",
+      "max_lv": 10,
+      "effect": "Reduces the damage from monster attacks shown with a red warning by 1(+1 per Regislet Level)%. However, damage taken from single-target attacks increases by 10%(disadvantage).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "270",
+        "levels": [
+          270
+        ]
+      }
+    },
+    {
+      "name": "Remedial Rampage",
+      "max_lv": 10,
+      "effect": "Removes the finishing attack of the skill \"Rampage\" and restores (50 HP × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "150-210",
+        "levels": [
+          150,
+          170,
+          190,
+          210
+        ]
+      }
+    },
+    {
+      "name": "Role Model",
+      "max_lv": 10,
+      "effect": "Greatly suppresses your own damage output to increase your party members' EXP Gain by 1(+1 per Regislet Level)%.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "250",
+        "levels": [
+          250
+        ]
+      }
+    },
+    {
+      "name": "Savior",
+      "max_lv": 1,
+      "effect": "Grants a 10-second invincibility if you revive when all of your party members get knocked out.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "130 & 220",
+        "levels": [
+          130,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Secret Chase ATK Boost",
+      "max_lv": 1,
+      "effect": "Increases the activation rate of additional attack of \"Secret Chase Attack\" by 1% per level of the skill acquired.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "170-220",
+        "levels": [
+          170,
+          190,
+          210,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Secret Combo",
+      "max_lv": 10,
+      "effect": "Reduces aggro by (Registlet Level)% per 1 combo. Better effect with longer combo.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "170 & 230",
+        "levels": [
+          170,
+          230
+        ]
+      }
+    },
+    {
+      "name": "Shared Destiny",
+      "max_lv": 10,
+      "effect": "Each party member excluding you will raise ATK and MATK by 1%, but [110 - (10 × Registlet Level)]% of HP will be lost whenever a member gets knocked out.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "70, 190, 220 & 270",
+        "levels": [
+          70,
+          190,
+          220,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Shell Break Enhancer",
+      "max_lv": 5,
+      "effect": "Raises the chance to inflict Armor Break with the skill \"Shell Break\" by (5% × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "70-150 & 220",
+        "levels": [
+          70,
+          90,
+          110,
+          130,
+          150,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Short Performance",
+      "max_lv": 1,
+      "effect": "Shortens the duration of dance skill effect by 5 seconds. *Does not apply to Spirited Dance.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "190 & 220",
+        "levels": [
+          190,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Silent P. Defense",
+      "max_lv": 10,
+      "effect": "Reduces the aggro generated when P. Defense is successful by (10 × Registlet Level)%.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "210 & 270",
+        "levels": [
+          210,
+          270
+        ]
+      }
+    },
+    {
+      "name": "Single Meteor Strike",
+      "max_lv": 1,
+      "effect": "Reduces the number of meteorites dropped from \"Meteor Strike\" to 1, but the drop point will no longer be random. It will no longer inflict status ailments either.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "170, 220 & 230",
+        "levels": [
+          170,
+          220,
+          230
+        ]
+      }
+    },
+    {
+      "name": "Smash Enhancer",
+      "max_lv": 20,
+      "effect": "Raises the power of \"Smash\" by (5% × Registlet Level) if used with knuckles.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "30-130",
+        "levels": [
+          30,
+          50,
+          70,
+          90,
+          110,
+          130
+        ]
+      }
+    },
+    {
+      "name": "Smoke Dust Extender",
+      "max_lv": 10,
+      "effect": "Extends the duration of buff from the skill \"Smoke Dust\" by (1 second × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "150-210",
+        "levels": [
+          150,
+          170,
+          190,
+          210
+        ]
+      }
+    },
+    {
+      "name": "Sneak Attack Timer",
+      "max_lv": 1,
+      "effect": "The skill \"Sneak Attack\" changes into a time-based buff instead of remaining use-based.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "250",
+        "levels": [
+          250
+        ]
+      }
+    },
+    {
+      "name": "Sonic Blade Extender",
+      "max_lv": 20,
+      "effect": "Extends the time you must reuse \"Sonic Blade\" to turn it into \"Super Sonic Blade\" by 1 second per Registlet Level.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "30-130",
+        "levels": [
+          30,
+          50,
+          70,
+          90,
+          110,
+          130
+        ]
+      }
+    },
+    {
+      "name": "Sonic Wave Enhancer",
+      "max_lv": 20,
+      "effect": "Raises the power of \"Sonic Wave\" by (5% × Registlet Level) if used with knuckles.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "30-130",
+        "levels": [
+          30,
+          50,
+          70,
+          90,
+          110,
+          130
+        ]
+      }
+    },
+    {
+      "name": "Speed Resonance",
+      "max_lv": 9,
+      "effect": "\"Resonance\" will only enhance stats that affect acceleration, but the enhancement is reduced by [95 - (5 × Registlet Level)]%.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "190 & 250",
+        "levels": [
+          190,
+          250
+        ]
+      }
+    },
+    {
+      "name": "Spinning Slash Compress",
+      "max_lv": 10,
+      "effect": "Reduces the range of \"Spinning Slash\" and removes the knock back effect, but raises its power by (5% × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "70-150",
+        "levels": [
+          70,
+          90,
+          110,
+          130,
+          150
+        ]
+      }
+    },
+    {
+      "name": "Spiral Air Enhancer",
+      "max_lv": 20,
+      "effect": "Raises the power of \"Spiral Air\" by (2% × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "70-150",
+        "levels": [
+          70,
+          90,
+          110,
+          130,
+          150
+        ]
+      }
+    },
+    {
+      "name": "Sprint Sheathe Remover",
+      "max_lv": 1,
+      "effect": "Sheathing while moving will no longer occur.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "230",
+        "levels": [
+          230
+        ]
+      }
+    },
+    {
+      "name": "Start Dash",
+      "max_lv": 5,
+      "effect": "Normal attack has 0 second cooldown for (5 + Registlet Level) seconds when getting aggro from the target monster for the first time. Cooldown: 60 seconds.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "170 & 220",
+        "levels": [
+          170,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Static Triple Thrust",
+      "max_lv": 1,
+      "effect": "You will remain in the same spot when using the skill \"Triple Thrust\".",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "70-150 & 220",
+        "levels": [
+          70,
+          90,
+          110,
+          130,
+          150,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Steady Stance",
+      "max_lv": 10,
+      "effect": "Reduces damage taken while afflicted with Stop by (3% × Registlet Level) if you stand still.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "70-90",
+        "levels": [
+          70,
+          90
+        ]
+      }
+    },
+    {
+      "name": "Sunbath",
+      "max_lv": 4,
+      "effect": "When using Emotions that increase Natural Regen, an additional (25 × Registlet Level)% of MP will be restored.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "10-70 & 220",
+        "levels": [
+          10,
+          30,
+          50,
+          70,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Sword Tempest Extender",
+      "max_lv": 1,
+      "effect": "Adds 1 hit to the skill \"Sword Tempest\".",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "150-220",
+        "levels": [
+          150,
+          170,
+          190,
+          210,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Tanker's Pet",
+      "max_lv": 10,
+      "effect": "Lowers the damage received by pet by (3% × Registlet Level), but greatly increases the damage received by its owner.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "90 & 230",
+        "levels": [
+          90,
+          230
+        ]
+      }
+    },
+    {
+      "name": "Target Declaration",
+      "max_lv": 1,
+      "effect": "When you are drawing the enemy's attention (aggro), you will declare it through Party Chat. If it is a Guild RAID, you will declare it through Say Chat.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "230",
+        "levels": [
+          230
+        ]
+      }
+    },
+    {
+      "name": "Transfer",
+      "max_lv": 10,
+      "effect": "Lowers MaxMP by [1100 - (100 × Registlet Level)], but when you are knocked out, the remaining MP will be shared among your party members.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "150 & 250",
+        "levels": [
+          150,
+          250
+        ]
+      }
+    },
+    {
+      "name": "Tricky Shadow Walk",
+      "max_lv": 1,
+      "effect": "Additional attack of \"Shadow Walk\" will no longer cause proration.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "190 & 220",
+        "levels": [
+          190,
+          220
+        ]
+      }
+    },
+    {
+      "name": "Twin Slash Enhancer",
+      "max_lv": 1,
+      "effect": "Raises the critical damage from \"Twin Slash\" by (1% × Registlet Level).",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "30-130",
+        "levels": [
+          30,
+          50,
+          70,
+          90,
+          110,
+          130
+        ]
+      }
+    },
+    {
+      "name": "Universal Ether Flare",
+      "max_lv": 1,
+      "effect": "\"Ether Flare\" will recover Attack MP even if the element is not the target's weakness.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "170-210",
+        "levels": [
+          170,
+          190,
+          210
+        ]
+      }
+    },
+    {
+      "name": "Unsheather Wind Release",
+      "max_lv": 10,
+      "effect": "Adds Magic Pierce (5% per Regislet Level) attribute to the skill \"Wind Release\" and when the skill changes, an Unsheathe Attack attribute is added.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "230",
+        "levels": [
+          230
+        ]
+      }
+    },
+    {
+      "name": "Violent Lunar Misfortune",
+      "max_lv": 10,
+      "effect": "While Storm Reaper's buff is active the skill \"Lunar Misfortune\" becomes a close-range attack regardless of distance. (15 - Regislet Level) seconds cooldown after activation.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "270",
+        "levels": [
+          270
+        ]
+      }
+    },
+    {
+      "name": "Water Release: Aqua Mirror",
+      "max_lv": 1,
+      "effect": "Changes \"Water Release\" from a deployable skill to a buff skill.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "270",
+        "levels": [
+          270
+        ]
+      }
+    },
+    {
+      "name": "Water Talent",
+      "max_lv": 1,
+      "effect": "Sets skill effects that change based on element to Water element.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "220",
+        "levels": [
+          220
+        ]
+      }
+    },
+    {
+      "name": "Wayfarer",
+      "max_lv": 10,
+      "effect": "Increases EXP Gain by 10% but lowers damage dealt by (15 - Registlet Level)%.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "10-90",
+        "levels": [
+          10,
+          30,
+          50,
+          70,
+          90
+        ]
+      }
+    },
+    {
+      "name": "Wind Talent",
+      "max_lv": 1,
+      "effect": "Sets skill effects that change based on element to Wind element.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "220",
+        "levels": [
+          220
+        ]
+      }
+    },
+    {
+      "name": "Zero Stance",
+      "max_lv": 10,
+      "effect": "Damage dealt with skill activated without using a combo is multiplied by [1 + (0.01 × Registlet Level)]. *Does not apply to some skills such as charge skills.",
+      "affects_skill": null,
+      "obtained_from": {
+        "source": "Stoodie",
+        "location": "El Scaro",
+        "level_notation": "170 & 250",
+        "levels": [
+          170,
+          250
+        ]
+      }
+    }
+  ]
+}
