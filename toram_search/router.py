@@ -54,14 +54,14 @@ def select_surviving_domains(
 
 
 def select_winning_interpretation(*outcomes) -> QueryInterpretation | None:
-    candidates = []
-    for priority, outcome in enumerate(outcomes):
-        if outcome is None or outcome.interpretation is None:
-            continue
-        candidates.append((outcome.route_quality.sort_key, -priority, outcome.interpretation))
+    candidates = [
+        (outcome.route_quality.sort_key, -priority, outcome)
+        for priority, outcome in enumerate(outcomes)
+        if outcome is not None
+    ]
     if not candidates:
         return None
-    return max(candidates, key=lambda row: (row[0], row[1]))[2]
+    return max(candidates, key=lambda row: (row[0], row[1]))[2].interpretation
 
 
 def _suppress_outcome(domain: SearchDomain, outcome):
