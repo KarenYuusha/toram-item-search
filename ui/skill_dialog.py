@@ -32,6 +32,10 @@ def show_skill_dialog(card: SkillCardResult) -> None:
     if skill.ailments: st.write('**Ailments:** '+', '.join(skill.ailments))
     if skill.weapon_requirements: st.write('**Weapon requirements:** '+', '.join(skill.weapon_requirements))
     if skill.weapon_restrictions: st.write('**Weapon restrictions:** '+', '.join(skill.weapon_restrictions))
+    if card.related_registlets:
+        st.markdown('#### Related Registlets')
+        for name in card.related_registlets:
+            st.write(name)
     if skill.description: st.markdown('#### Description'); st.write(skill.description)
     if skill.game_description: st.markdown('#### Game description'); st.write(skill.game_description)
     for section in skill.sections:
