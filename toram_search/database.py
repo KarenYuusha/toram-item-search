@@ -4,11 +4,16 @@ from pathlib import Path
 import sqlite3
 from urllib.parse import quote
 
+from toram_search.food.data import FoodDataError, load_food_dataset
+from toram_search.registlets.data import RegistletDataError, load_registlet_dataset
 from .models import DatabaseHealth
 
 ROOT = Path(__file__).resolve().parents[1]
 ITEM_DATABASE = ROOT / "items.sqlite"
 SKILL_DATABASE = ROOT / "skills.sqlite"
+FOOD_ENTRIES = ROOT / "food_entries.csv"
+FOOD_ALIASES = ROOT / "food_stat_aliases.json"
+REGISTLET_DATA = ROOT / "registlets.json"
 
 ITEM_REQUIRED_COLUMNS: dict[str, set[str]] = {
     "items": {"id", "name", "item_type", "sell_price", "process_material", "process_amount", "badge", "note", "page_url"},
@@ -68,5 +73,42 @@ def validate_skill_database(path: Path) -> DatabaseHealth:
     return _validate_schema("Skills", path, SKILL_REQUIRED_COLUMNS)
 
 
-def validate_databases(items_path: Path = ITEM_DATABASE, skills_path: Path = SKILL_DATABASE) -> tuple[DatabaseHealth, DatabaseHealth]:
+def validate_food_sources(
+    entries_path: Path = FOOD_ENTRIES,
+    aliases_path: Path = FOOD_ALIASES,
+) -> DatabaseHealth:
+    try:
+        load_food_dataset(entries_path, aliases_path)
+        return DatabaseHealth('Food', Path(entries_path), True)
+    except (FoodDataError, OSError) as exc:
+        return DatabaseHealth('Food', Path(entries_path), False, str(exc))
+
+
+def validate_registlet_source(path: Path = REGISTLET_DATA) -> DatabaseHealth:
+    try:
+        load_registlet_dataset(path)
+        return DatabaseHealth('Registlets', Path(path), True)
+    except (RegistletDataError, OSError) as exc:
+        return DatabaseHealth('Registlets', Path(path), False, str(exc))
+
+
+def validate_databases(
+    items_path: Path = ITEM_DATABASE,
+    skills_path: Path = SKILL_DATABASE,
+) -> tuple[DatabaseHealth, DatabaseHealth]:
     return validate_item_database(items_path), validate_skill_database(skills_path)
+
+
+def validate_sources(
+    items_path: Path = ITEM_DATABASE,
+    skills_path: Path = SKILL_DATABASE,
+    food_entries_path: Path = FOOD_ENTRIES,
+    food_aliases_path: Path = FOOD_ALIASES,
+    registlets_path: Path = REGISTLET_DATA,
+) -> tuple[DatabaseHealth, DatabaseHealth, DatabaseHealth, DatabaseHealth]:
+    return (
+        validate_item_database(items_path),
+        validate_skill_database(skills_path),
+        validate_food_sources(food_entries_path, food_aliases_path),
+        validate_registlet_source(registlets_path),
+    )
