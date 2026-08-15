@@ -45,6 +45,8 @@ Search by Registlet name: `Arrow Rain Enhancer`.
 
 Search by effect: `restores mp`, `physical pierce`, or `inflicts stun`.
 
+Registlet results come from `registlets.json`, not the Item database.
+
 In Universal mode, Registlet effect matches are weaker than exact or structured matches.
 """
             )
