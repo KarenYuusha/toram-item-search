@@ -1,9 +1,13 @@
 from __future__ import annotations
 from pathlib import Path
 import streamlit as st
+from toram_search.food.models import FoodSearchOutcome
 from toram_search.items.models import ItemSearchOutcome
+from toram_search.registlets.models import RegistletSearchOutcome
 from toram_search.skills.models import SkillSearchOutcome
+from ui.food_cards import render_food_cards
 from ui.item_cards import render_item_cards
+from ui.registlet_cards import render_registlet_cards
 from ui.skill_cards import render_skill_cards
 
 
@@ -34,4 +38,21 @@ def render_skill_results(outcome:SkillSearchOutcome,*,limit:int)->str|None:
     fill_query=_render_message(outcome.kind,outcome.message,outcome.suggested_queries,key_prefix='skill')
     if outcome.results:
         st.markdown(f'### Skills · {len(outcome.results)}'); render_skill_cards(outcome.results,limit=limit)
+    return fill_query
+
+
+def render_food_results(outcome:FoodSearchOutcome,*,limit:int)->str|None:
+    fill_query=_render_message(outcome.kind,outcome.message,outcome.suggested_queries,key_prefix='food')
+    if outcome.results:
+        st.markdown(f'### Food Codes · {len(outcome.results)}')
+        st.caption(outcome.results[0].stat_display)
+        render_food_cards(outcome.results,limit=limit)
+    return fill_query
+
+
+def render_registlet_results(outcome:RegistletSearchOutcome,*,limit:int)->str|None:
+    fill_query=_render_message(outcome.kind,outcome.message,outcome.suggested_queries,key_prefix='registlet')
+    if outcome.results:
+        st.markdown(f'### Registlets · {len(outcome.results)}')
+        render_registlet_cards(outcome.results,limit=limit)
     return fill_query
