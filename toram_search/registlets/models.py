@@ -25,6 +25,13 @@ class RegistletDataset:
 
 
 RegistletOutcomeKind = Literal['results', 'clarify', 'suggest', 'not_found']
+RegistletMatchKind = Literal['name', 'effect', 'stoodie', 'fuzzy_name']
+
+
+@dataclass(frozen=True)
+class RegistletMatch:
+    kind: RegistletMatchKind
+    detail: str | None = None
 
 
 @dataclass(frozen=True)
@@ -36,3 +43,4 @@ class RegistletSearchOutcome:
     suggested_queries: tuple[str, ...] = ()
     interpretation: QueryInterpretation | None = None
     route_quality: RouteQuality = RouteQuality()
+    match: RegistletMatch | None = None
