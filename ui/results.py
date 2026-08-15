@@ -54,5 +54,5 @@ def render_registlet_results(outcome:RegistletSearchOutcome,*,limit:int)->str|No
     fill_query=_render_message(outcome.kind,outcome.message,outcome.suggested_queries,key_prefix='registlet')
     if outcome.results:
         st.markdown(f'### Registlets · {len(outcome.results)}')
-        render_registlet_cards(outcome.results,limit=limit)
+        render_registlet_cards(outcome.results,limit=limit,match=outcome.match)
     return fill_query
