@@ -6,9 +6,10 @@ from typing import Literal
 ChipKind = Literal[
     'stat', 'item_type', 'numeric_stat', 'rank',
     'skill_tree', 'ailment', 'mp', 'required_level',
+    'food_stat', 'stoodie_level',
 ]
-SearchDomain = Literal['Items', 'Skills']
-RouteFamily = Literal['exact', 'structured', 'weak', 'none']
+SearchDomain = Literal['Items', 'Skills', 'Food', 'Registlets']
+RouteFamily = Literal['exact', 'structured', 'content', 'weak', 'none']
 
 
 @dataclass(frozen=True)
@@ -43,12 +44,14 @@ class RouteQuality:
     @property
     def sort_key(self) -> tuple[int, int, int]:
         if self.family in {'exact', 'structured'} and self.has_results:
-            result_tier = 3
+            result_tier = 4
         elif self.family in {'exact', 'structured'}:
+            result_tier = 3
+        elif self.family == 'content' and self.has_results:
             result_tier = 2
         elif self.family == 'weak' and self.has_results:
             result_tier = 1
         else:
             result_tier = 0
-        family_rank = {'exact': 2, 'structured': 1, 'weak': 0, 'none': 0}[self.family]
+        family_rank = {'exact': 3, 'structured': 2, 'content': 1, 'weak': 0, 'none': 0}[self.family]
         return result_tier, family_rank, self.specificity
