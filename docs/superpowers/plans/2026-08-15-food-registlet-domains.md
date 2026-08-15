@@ -4,7 +4,7 @@
 
 **Goal:** Add deterministic Food and Registlet search domains, cross-domain Universal routing, Registlet effect search, Skill↔Registlet relationships, autocomplete, help, and UI integration without changing the committed SQLite databases.
 
-**Architecture:** Keep Food and Registlet as small source-backed modules beside the existing Item and Skill modules. Each domain owns loading, validation, parsing, models, and search; `router.py` compares only shared `RouteQuality` metadata and suppresses lower-quality outcomes generically. Streamlit remains a rendering/state layer and continues to search only after explicit submission.
+**Architecture:** Keep Food and Registlet as small source-backed modules beside the existing Item and Skill modules. Each domain owns loading, validation, parsing, models, and search; `router.py` compares shared `RouteQuality` metadata and suppresses lower-quality outcomes without domain-pair special cases. Streamlit remains a rendering/state layer and searches only after explicit submission.
 
 **Tech Stack:** Python 3, Streamlit `>=1.61,<1.62`, RapidFuzz `>=3,<4`, SQLite read-only access for existing Items/Skills, CSV/JSON for Food/Registlet sources, pytest.
 
@@ -26,27 +26,30 @@
 
 ## File Structure
 
-Create these focused domain modules:
+Create:
 
 ```text
-toram_search/
-  food/
-    __init__.py          public Food exports
-    models.py            Food definitions, entries, dataset, search outcome
-    data.py              alias/CSV loading, normalization, validation, caching
-    service.py           prefix parsing, stat lookup, ordering, suggestions
-  registlets/
-    __init__.py          public Registlet exports
-    models.py            Registlet records, dataset, search outcome
-    data.py              JSON loading, validation, caching
-    relationships.py     manual Skill relation validation + reverse index
-    service.py           Stoodie/name/effect/fuzzy search
-ui/
-  food_cards.py          grouped Food level/code rendering
-  registlet_cards.py     Registlet cards/detail rendering
+toram_search/food/__init__.py
+toram_search/food/models.py
+toram_search/food/data.py
+toram_search/food/service.py
+toram_search/registlets/__init__.py
+toram_search/registlets/models.py
+toram_search/registlets/data.py
+toram_search/registlets/relationships.py
+toram_search/registlets/service.py
+ui/food_cards.py
+ui/registlet_cards.py
+tests/test_food_data.py
+tests/test_food_search.py
+tests/test_registlet_data.py
+tests/test_registlet_search.py
+tests/test_registlet_relationships.py
+tests/test_autocomplete_domains.py
+tests/test_universal_domains.py
 ```
 
-Modify only the shared integration files that need the new domains:
+Modify:
 
 ```text
 toram_search/interpretation.py
@@ -60,20 +63,12 @@ ui/skill_dialog.py
 ui/sidebar.py
 main.py
 README.md
+tests/test_interpretation.py
+tests/test_database.py
+tests/test_real_databases.py
+tests/test_app_shell.py
+tests/test_ui_contract.py
 ```
-
-Add focused tests instead of putting all behavior in one file:
-
-```text
-tests/test_food_data.py
-tests/test_food_search.py
-tests/test_registlet_data.py
-tests/test_registlet_search.py
-tests/test_registlet_relationships.py
-tests/test_universal_domains.py
-```
-
-Extend existing `tests/test_interpretation.py`, `tests/test_database.py`, `tests/test_real_databases.py`, `tests/test_app_shell.py`, and `tests/test_ui_contract.py` for shared contracts/regressions.
 
 ---
 
@@ -85,15 +80,16 @@ Extend existing `tests/test_interpretation.py`, `tests/test_database.py`, `tests
 - Test: `tests/test_interpretation.py`
 
 **Interfaces:**
-- Produces `SearchDomain = Literal['Items', 'Skills', 'Food', 'Registlets']`.
-- Produces `RouteFamily = Literal['exact', 'structured', 'content', 'weak', 'none']`.
-- Produces `ChipKind` additions `food_stat` and `stoodie_level`.
-- Extends `DatabaseMode` with `Food` and `Registlets`.
-- Extends `UniversalSearchOutcome` with optional `food` and `registlets` outcomes.
+- `SearchDomain = Literal['Items', 'Skills', 'Food', 'Registlets']`
+- `RouteFamily = Literal['exact', 'structured', 'content', 'weak', 'none']`
+- `ChipKind` adds `food_stat` and `stoodie_level`.
+- `DatabaseMode` adds `Food` and `Registlets`.
+- `SuggestionKind` adds `Food Stat`, `Registlet`, and `Stoodie Level`.
+- `UniversalSearchOutcome` adds optional `food` and `registlets` fields under `TYPE_CHECKING` imports.
 
-- [ ] **Step 1: Write the failing route-quality and type-contract tests**
+- [ ] **Step 1: Write the failing type/quality tests**
 
-Add to `tests/test_interpretation.py`:
+Add:
 
 ```python
 def test_content_route_sits_between_structured_no_result_and_weak_result() -> None:
@@ -116,19 +112,17 @@ def test_new_domain_interpretations_are_valid() -> None:
     assert stoodie.query_without('stoodie_level') == ''
 ```
 
-- [ ] **Step 2: Run the focused tests and confirm RED**
-
-Run:
+- [ ] **Step 2: Confirm RED**
 
 ```bash
 pytest tests/test_interpretation.py -q
 ```
 
-Expected: failures because `content`, `Food`, `Registlets`, `food_stat`, and `stoodie_level` are not accepted yet.
+Expected: new literals are rejected by the current definitions.
 
-- [ ] **Step 3: Implement the minimal shared-model changes**
+- [ ] **Step 3: Implement minimal shared changes**
 
-Use this route ordering in `RouteQuality.sort_key`:
+Use this `RouteQuality.sort_key` tiering:
 
 ```python
 if self.family in {'exact', 'structured'} and self.has_results:
@@ -145,17 +139,11 @@ family_rank = {'exact': 3, 'structured': 2, 'content': 1, 'weak': 0, 'none': 0}[
 return result_tier, family_rank, self.specificity
 ```
 
-Extend `toram_search/models.py` without importing runtime domain classes; keep Food/Registlet imports under `TYPE_CHECKING` exactly as Items/Skills are handled.
-
-- [ ] **Step 4: Run shared model tests GREEN**
-
-Run:
+- [ ] **Step 4: Confirm GREEN**
 
 ```bash
 pytest tests/test_interpretation.py -q
 ```
-
-Expected: all tests pass, including the existing exact/structured/weak ordering regressions.
 
 - [ ] **Step 5: Commit**
 
@@ -179,13 +167,11 @@ git commit -m "refactor: generalize search domain routing types"
 - `FoodStatDefinition(key: str, display: str, aliases: tuple[str, ...])`
 - `FoodEntry(code: str, stat_key: str, stat_display: str, level: int)`
 - `FoodDataset(stats: tuple[FoodStatDefinition, ...], entries: tuple[FoodEntry, ...], warnings: tuple[str, ...])`
-- `FoodDataError(ValueError)` for a malformed/missing top-level source.
+- `FoodDataError(ValueError)`
 - `load_food_dataset(entries_path: Path, aliases_path: Path) -> FoodDataset`
 - `resolve_food_stat(dataset: FoodDataset, value: str) -> FoodStatDefinition | None`
 
 - [ ] **Step 1: Write failing loader tests**
-
-Create fixtures directly in `tests/test_food_data.py` and assert exact behavior:
 
 ```python
 def test_food_loader_resolves_key_display_alias_and_deduplicates(tmp_path: Path) -> None:
@@ -207,21 +193,19 @@ def test_food_loader_resolves_key_display_alias_and_deduplicates(tmp_path: Path)
     ]
 ```
 
-Also add tests that a malformed row is skipped with a row-numbered warning, unknown stat is not fuzzy-reinterpreted, code keeps leading zeros, and malformed aliases raise `FoodDataError`.
+Add concrete tests for a row-numbered malformed-row warning, unknown stat rejection, leading-zero code preservation, integer level validation, and malformed alias JSON raising `FoodDataError`.
 
-- [ ] **Step 2: Run loader tests and confirm RED**
+- [ ] **Step 2: Confirm RED**
 
 ```bash
 pytest tests/test_food_data.py -q
 ```
 
-Expected: import/module failures because the Food package does not exist.
+- [ ] **Step 3: Implement exact normalization/validation and source-aware caching**
 
-- [ ] **Step 3: Implement exact normalization, validation, and cache invalidation**
+`normalize_food_text` casefolds, collapses whitespace, removes periods used in abbreviations, and normalizes spacing around `%`, `+`, and `-`; it must preserve the semantic plus/minus sign for Aggro. Build one exact lookup from every key, display label, and alias. CSV rows never use fuzzy or substring stat resolution.
 
-`normalize_food_text` should normalize case, whitespace, periods, and spacing around `%`, `+`, and `-`, but must not remove the semantic sign from Aggro. Build one exact lookup containing every stat key, display label, and alias. Do not use substring or fuzzy matching while loading CSV rows.
-
-Cache by resolved source path plus `st_mtime_ns` and size, e.g.:
+Cache using path plus file identity:
 
 ```python
 @lru_cache(maxsize=16)
@@ -230,15 +214,13 @@ def _cached_load(entries_name: str, entries_mtime: int, entries_size: int,
     return _load_uncached(Path(entries_name), Path(aliases_name))
 ```
 
-`load_food_dataset()` computes those file identities and calls `_cached_load`.
+`load_food_dataset()` resolves both paths, reads `st_mtime_ns` and `st_size`, then calls `_cached_load`.
 
-- [ ] **Step 4: Run loader tests GREEN**
+- [ ] **Step 4: Confirm GREEN**
 
 ```bash
 pytest tests/test_food_data.py -q
 ```
-
-Expected: all Food data tests pass.
 
 - [ ] **Step 5: Commit**
 
@@ -249,7 +231,7 @@ git commit -m "feat: load and validate Food sources"
 
 ---
 
-### Task 3: Implement prefix-gated Food search and Food interpretation
+### Task 3: Implement prefix-gated Food search and interpretation
 
 **Files:**
 - Create: `toram_search/food/service.py`
@@ -257,22 +239,22 @@ git commit -m "feat: load and validate Food sources"
 - Create: `tests/test_food_search.py`
 
 **Interfaces:**
-- `FoodSearchOutcome(kind, query, results, message, suggested_queries, interpretation, route_quality)` with result tuple of `FoodEntry`.
-- `is_food_intent(query: str) -> bool` returns true only for a first standalone `food` or `code` token.
-- `FoodSearchService(entries_path: Path, aliases_path: Path)`.
-- `FoodSearchService.search(query: str) -> FoodSearchOutcome`.
-- `FoodSearchService.list_autocomplete_values() -> tuple[tuple[str, Literal['Food Stat']], ...]` returns prefixed values such as `food MaxMP`.
+- `FoodSearchOutcome(kind, query, results, message, suggested_queries, interpretation, route_quality)`
+- `is_food_intent(query: str) -> bool`
+- `FoodSearchService(entries_path: Path, aliases_path: Path)`
+- `FoodSearchService.search(query: str) -> FoodSearchOutcome`
+- `FoodSearchService.list_autocomplete_values() -> tuple[tuple[str, Literal['Food Stat']], ...]`
 
 - [ ] **Step 1: Write failing Food query tests**
-
-Cover the approved syntax:
 
 ```python
 @pytest.mark.parametrize('query', ['food maxmp', 'code max mp'])
 def test_food_search_requires_prefix_and_orders_highest_level_first(food_files, query) -> None:
     outcome = FoodSearchService(*food_files).search(query)
     assert outcome.route_quality.family == 'structured'
-    assert [row.level for row in outcome.results] == sorted((row.level for row in outcome.results), reverse=True)
+    assert [row.level for row in outcome.results] == sorted(
+        (row.level for row in outcome.results), reverse=True
+    )
     assert outcome.interpretation is not None
     assert outcome.interpretation.domain == 'Food'
 
@@ -284,40 +266,41 @@ def test_food_does_not_activate_without_leading_prefix(food_files, query) -> Non
     assert outcome.results == ()
 ```
 
-Add `code ampr`, `food dt dark`, and `food -aggro` alias tests. Add invalid/missing stat tests that remain `structured` with no results and emit prefixed fill-only suggestions such as `food MaxMP`.
+Add direct assertions for `code ampr`, `food dt dark`, `food -aggro`, empty remainder, and unknown-stat suggestions. All suggestions must themselves start with `food ` or `code `.
 
-- [ ] **Step 2: Run query tests and confirm RED**
+- [ ] **Step 2: Confirm RED**
 
 ```bash
 pytest tests/test_food_search.py -q
 ```
 
-Expected: failures because `FoodSearchService` is absent.
+- [ ] **Step 3: Implement first-token parsing and canonical lookup**
 
-- [ ] **Step 3: Implement exact prefix parsing and stat search**
-
-Use a first-token regex equivalent to:
+Use:
 
 ```python
 match = re.match(r'^\s*(food|code)(?:\s+|$)(.*)$', query, re.IGNORECASE)
 ```
 
-If no match, return family `none`. If the prefix is recognized but remainder is empty/unknown, return family `structured`, `has_results=False`, Food-specific guidance, and no weak fallback. For valid stats, sort rows by `(-level, code)` and emit one `QueryChip`:
+No match returns family `none`. Recognized prefix plus missing/unknown stat returns family `structured`, no results, Food-specific guidance, and no weak fallback. Valid stats sort by `(-level, code)` and emit:
 
 ```python
 QueryChip(
-    id='food_stat', kind='food_stat', label=f'Food: {stat.display}',
-    canonical_fragment=f'food {stat.display}', query_without='',
+    id='food_stat',
+    kind='food_stat',
+    label=f'Food: {stat.display}',
+    canonical_fragment=f'food {stat.display}',
+    query_without='',
 )
 ```
 
-- [ ] **Step 4: Run Food tests GREEN**
+Nearby unknown-stat suggestions may use full-string `fuzz.ratio` over normalized alias/display values only; return at most three unique prefixed canonical suggestions and never turn those suggestions into result matches.
+
+- [ ] **Step 4: Confirm GREEN**
 
 ```bash
 pytest tests/test_food_data.py tests/test_food_search.py -q
 ```
-
-Expected: all pass.
 
 - [ ] **Step 5: Commit**
 
@@ -339,18 +322,16 @@ git commit -m "feat: add prefix-gated Food search"
 - Create: `tests/test_registlet_search.py`
 
 **Interfaces:**
-- `RegistletRecord(name, max_lv, effect, affects_skill, source, location, source_levels)`.
-- `RegistletDataset(records, valid_stoodie_levels, warnings)`.
-- `RegistletDataError(ValueError)`.
-- `load_registlet_dataset(path: Path) -> RegistletDataset` with mtime/size-aware caching.
-- `is_stoodie_intent(query: str) -> bool`.
-- `RegistletSearchOutcome(kind, query, results, message, suggested_queries, interpretation, route_quality)`.
-- `RegistletSearchService(path: Path).search(query: str) -> RegistletSearchOutcome`.
-- `list_autocomplete_values() -> tuple[tuple[str, Literal['Registlet']], ...]`.
+- `RegistletRecord(name: str, max_lv: int, effect: str, affects_skill: tuple[str, ...] | None, source: str, location: str, source_levels: tuple[int, ...])`
+- `RegistletDataset(records: tuple[RegistletRecord, ...], valid_stoodie_levels: tuple[int, ...], warnings: tuple[str, ...])`
+- `RegistletDataError(ValueError)`
+- `load_registlet_dataset(path: Path) -> RegistletDataset`
+- `is_stoodie_intent(query: str) -> bool`
+- `RegistletSearchOutcome(kind, query, results, message, suggested_queries, interpretation, route_quality)`
+- `RegistletSearchService(path: Path).search(query: str) -> RegistletSearchOutcome`
+- `RegistletSearchService.list_autocomplete_values() -> tuple[tuple[str, Literal['Registlet']], ...]`
 
-- [ ] **Step 1: Write failing Registlet loader/search tests**
-
-Use a small JSON fixture with records that distinguish phrase, token-only, exact name, and fuzzy name behavior. Required assertions include:
+- [ ] **Step 1: Write failing loader/search tests**
 
 ```python
 @pytest.mark.parametrize('query', [
@@ -376,38 +357,39 @@ def test_effect_phrase_match_is_content_route(registlet_file) -> None:
     assert outcome.results
 ```
 
-Also prove phrase matches sort before all-token matches, fuzzy typo recovery uses only names, invalid `std 200` suggests nearest metadata levels, and `level_notation` is not reparsed.
+The fixture must include one phrase match, one all-token-only match, and one Registlet whose name has a typo-recoverable variant. Add assertions for phrase-before-token ordering, case-insensitive exact names, fuzzy name recovery, invalid `std 200` nearest-level suggestions, malformed record warnings, malformed top-level JSON errors, and proof that `level_notation` is never reparsed.
 
-- [ ] **Step 2: Run focused tests and confirm RED**
+- [ ] **Step 2: Confirm RED**
 
 ```bash
 pytest tests/test_registlet_data.py tests/test_registlet_search.py -q
 ```
 
-Expected: Registlet package imports fail.
+- [ ] **Step 3: Implement deterministic search**
 
-- [ ] **Step 3: Implement deterministic parsing/search**
-
-Stoodie parsing accepts only one level and no ranges. Normalize effect text into whitespace-separated casefolded tokens. Effect route logic is exactly:
+Stoodie accepts one integer only. Effect normalization casefolds, replaces punctuation with spaces, and collapses whitespace. Search effect phrase first, then whole tokens:
 
 ```python
-phrase_hits = [r for r in records if normalized_query in normalize_effect(r.effect)]
+phrase_hits = [record for record in records if normalized_query in normalize_effect(record.effect)]
 if phrase_hits:
-    return sorted(phrase_hits, key=lambda r: r.name.casefold())
+    return tuple(sorted(phrase_hits, key=lambda record: record.name.casefold()))
 
-tokens = tuple(token for token in normalized_query.split() if token)
-token_hits = [r for r in records if all(token in normalize_effect(r.effect) for token in tokens)]
+query_tokens = set(normalized_query.split())
+token_hits = []
+for record in records:
+    effect_tokens = set(normalize_effect(record.effect).split())
+    if query_tokens and query_tokens <= effect_tokens:
+        token_hits.append(record)
+return tuple(sorted(token_hits, key=lambda record: record.name.casefold()))
 ```
 
-Do not call RapidFuzz on `effect`. Only after Stoodie, exact-name, and effect-content all fail may fuzzy name matching run, using deterministic score/name tie-breaking and the existing project threshold style.
+Only after Stoodie, exact name, and effect content return no result may RapidFuzz run against normalized Registlet names. Never run RapidFuzz on `effect`.
 
-- [ ] **Step 4: Run Registlet tests GREEN**
+- [ ] **Step 4: Confirm GREEN**
 
 ```bash
 pytest tests/test_registlet_data.py tests/test_registlet_search.py -q
 ```
-
-Expected: all pass.
 
 - [ ] **Step 5: Commit**
 
@@ -418,7 +400,7 @@ git commit -m "feat: add deterministic Registlet search"
 
 ---
 
-### Task 5: Build manual Skill↔Registlet relationships without changing skills.sqlite
+### Task 5: Build manual Skill↔Registlet relationships
 
 **Files:**
 - Create: `toram_search/registlets/relationships.py`
@@ -426,12 +408,28 @@ git commit -m "feat: add deterministic Registlet search"
 - Create: `tests/test_registlet_relationships.py`
 
 **Interfaces:**
-- `RegistletRelationshipIndex(by_skill: dict[str, tuple[str, ...]], warnings: tuple[str, ...])`.
-- `build_relationship_index(records: tuple[RegistletRecord, ...], canonical_skill_names: tuple[str, ...]) -> RegistletRelationshipIndex`.
-- `SkillCardResult.related_registlets: tuple[str, ...] = ()`.
-- Keys in `by_skill` use `casefold()` of canonical Skill names; values use Registlet display names sorted case-insensitively.
+- `RegistletRelationshipIndex(by_skill: dict[str, tuple[str, ...]], warnings: tuple[str, ...])`
+- `build_relationship_index(records: tuple[RegistletRecord, ...], canonical_skill_names: tuple[str, ...]) -> RegistletRelationshipIndex`
+- `SkillCardResult.related_registlets: tuple[str, ...] = ()`
 
 - [ ] **Step 1: Write failing relationship tests**
+
+Define this helper in the test file:
+
+```python
+def make_registlet(name: str, affects_skill: tuple[str, ...] | None) -> RegistletRecord:
+    return RegistletRecord(
+        name=name,
+        max_lv=1,
+        effect='Effect mentions Arrow Rain but must not create a relation.',
+        affects_skill=affects_skill,
+        source='Stoodie',
+        location='El Scaro',
+        source_levels=(220,),
+    )
+```
+
+Then test:
 
 ```python
 def test_relationship_index_supports_null_one_multiple_and_unknown() -> None:
@@ -444,30 +442,25 @@ def test_relationship_index_supports_null_one_multiple_and_unknown() -> None:
     index = build_relationship_index(records, ('Arrow Rain', 'Magic: Finale'))
     assert index.by_skill['arrow rain'] == ('Many', 'One')
     assert index.by_skill['magic: finale'] == ('Many',)
+    assert 'none' not in index.by_skill
     assert any('Missing Skill' in warning for warning in index.warnings)
 ```
 
-Also assert the source `RegistletRecord.affects_skill` remains unchanged and no inferred relation appears from effect text.
-
-- [ ] **Step 2: Run and confirm RED**
+- [ ] **Step 2: Confirm RED**
 
 ```bash
 pytest tests/test_registlet_relationships.py -q
 ```
 
-Expected: relationship module/type additions are missing.
+- [ ] **Step 3: Implement exact canonical-name relation validation**
 
-- [ ] **Step 3: Implement exact canonical-name validation**
+Build `{name.casefold(): name}` from canonical Skill names. Unknown references produce warnings and are skipped as edges; the Registlet record remains searchable. Do not fuzzy-correct relationship names and do not inspect effect text.
 
-Build `{name.casefold(): name}` from `SkillRepository.list_skill_names()` callers. Do not fuzzy-correct unknown relationship names. Add warnings for unknown names and skip only the invalid edge; keep the Registlet itself valid.
-
-- [ ] **Step 4: Run GREEN**
+- [ ] **Step 4: Confirm GREEN and Skill regression**
 
 ```bash
 pytest tests/test_registlet_relationships.py tests/test_skill_search.py -q
 ```
-
-Expected: new tests and existing Skill search tests pass.
 
 - [ ] **Step 5: Commit**
 
@@ -487,15 +480,15 @@ git commit -m "feat: add Registlet skill relationships"
 - Create: `tests/test_autocomplete_domains.py`
 
 **Interfaces:**
-- Add constants `FOOD_ENTRIES`, `FOOD_ALIASES`, `REGISTLET_DATA` rooted beside existing SQLite files.
-- `validate_food_sources(entries_path=FOOD_ENTRIES, aliases_path=FOOD_ALIASES) -> DatabaseHealth`.
-- `validate_registlet_source(path=REGISTLET_DATA) -> DatabaseHealth`.
-- `validate_sources(...) -> tuple[DatabaseHealth, DatabaseHealth, DatabaseHealth, DatabaseHealth]` ordered Items, Skills, Food, Registlets.
-- Extend `build_autocomplete_index(..., food_entries_path, food_aliases_path, registlets_path)`.
+- Add root constants `FOOD_ENTRIES`, `FOOD_ALIASES`, `REGISTLET_DATA`.
+- `validate_food_sources(entries_path: Path = FOOD_ENTRIES, aliases_path: Path = FOOD_ALIASES) -> DatabaseHealth`
+- `validate_registlet_source(path: Path = REGISTLET_DATA) -> DatabaseHealth`
+- `validate_sources(...) -> tuple[DatabaseHealth, DatabaseHealth, DatabaseHealth, DatabaseHealth]` in Items, Skills, Food, Registlets order.
+- Extend `build_autocomplete_index(mode, *, items_path, skills_path, food_entries_path, food_aliases_path, registlets_path, available_domains=None)`.
 
 - [ ] **Step 1: Write failing health/autocomplete tests**
 
-Assert a malformed Food aliases file makes Food unhealthy, a malformed Registlet top-level file makes Registlets unhealthy, and valid individual-row warnings do not make a domain unavailable. Autocomplete assertions:
+Assert malformed top-level Food aliases make Food unhealthy, malformed top-level Registlet JSON makes Registlets unhealthy, and valid files with skipped-row warnings remain healthy. Autocomplete must satisfy:
 
 ```python
 assert any(row.kind == 'Food Stat' and row.value == 'food MaxMP' for row in suggestions)
@@ -503,19 +496,19 @@ assert not any(row.kind == 'Food Stat' and row.value == 'MaxMP' for row in sugge
 assert any(row.kind == 'Registlet' and row.value == 'Arrow Rain Enhancer' for row in suggestions)
 ```
 
-- [ ] **Step 2: Run and confirm RED**
+If Stoodie suggestions are included, generate them from `dataset.valid_stoodie_levels` as values such as `std 220` with kind `Stoodie Level`; never hard-code a second valid-level list.
+
+- [ ] **Step 2: Confirm RED**
 
 ```bash
 pytest tests/test_database.py tests/test_autocomplete_domains.py -q
 ```
 
-Expected: missing validators/kinds/path arguments.
+- [ ] **Step 3: Implement validators and mode filtering**
 
-- [ ] **Step 3: Implement domain-local validation and autocomplete**
+Reuse the domain loaders inside validation so health and production loading cannot disagree. In Universal, autocomplete includes only available domains. Dedicated modes return only their domain's kinds. Existing Item/Skill ordering/deduplication behavior remains intact.
 
-Reuse the domain loaders as validators so production loading and health checks cannot disagree. Extend `_ALLOWED_BY_MODE` with Food/Registlet suggestion kinds. In Universal, include all healthy domain suggestions; callers skip unhealthy sources instead of failing the whole index.
-
-- [ ] **Step 4: Run GREEN**
+- [ ] **Step 4: Confirm GREEN**
 
 ```bash
 pytest tests/test_database.py tests/test_autocomplete_domains.py -q
@@ -530,7 +523,7 @@ git commit -m "feat: add Food and Registlet source health"
 
 ---
 
-### Task 7: Replace pairwise Universal suppression with four-domain route comparison
+### Task 7: Replace pairwise Universal suppression with four-domain quality comparison
 
 **Files:**
 - Modify: `toram_search/router.py`
@@ -539,56 +532,75 @@ git commit -m "feat: add Food and Registlet source health"
 - Modify: `tests/test_real_databases.py`
 
 **Interfaces:**
+- `select_surviving_domains(qualities: dict[SearchDomain, RouteQuality]) -> frozenset[SearchDomain]`
+- `select_winning_interpretation(*outcomes) -> QueryInterpretation | None`
 - Extend `search_database(mode, query, *, items_path, skills_path, food_entries_path, food_aliases_path, registlets_path, available_domains=None)`.
-- `available_domains` is a `frozenset[SearchDomain] | None`; `None` means all four are available for unit/backward-compatible callers.
-- Add helper `select_winning_interpretation(*outcomes)` using route quality, never result count.
-- Add helper that compares all present outcomes and suppresses lower-quality domain results; suppression is per-outcome replacement, not pairwise X-vs-Y rules.
-- When Registlet and Skill sources are both available, enrich returned `SkillCardResult.related_registlets` through the relationship index.
+- `available_domains: frozenset[SearchDomain] | None`; `None` means all four sources are expected to be available.
+- When Skills and Registlets are both available, enrich returned Skill cards with `related_registlets` from `build_relationship_index()`.
 
-- [ ] **Step 1: Write failing Universal routing regressions**
-
-Use stub/fake source fixtures so each quality family is controlled. Required cases:
+- [ ] **Step 1: Write failing pure route-comparison tests**
 
 ```python
-def test_exact_skill_suppresses_registlet_content_and_weak_item(...): ...
-def test_structured_food_suppresses_weak_other_domains(...): ...
-def test_stoodie_structured_suppresses_weak_other_domains(...): ...
-def test_registlet_content_outranks_weak_other_domains(...): ...
-def test_equal_route_quality_can_keep_legitimate_results(...): ...
-def test_structured_no_result_food_intent_suppresses_weak_guesses(...): ...
-def test_bare_maxmp_never_activates_food(...): ...
-def test_result_count_never_beats_route_quality(...): ...
+def test_exact_route_suppresses_content_and_weak() -> None:
+    survivors = select_surviving_domains({
+        'Skills': RouteQuality('exact', True, 1),
+        'Registlets': RouteQuality('content', True, 99),
+        'Items': RouteQuality('weak', True, 99),
+    })
+    assert survivors == frozenset({'Skills'})
+
+
+def test_structured_no_result_suppresses_content_result() -> None:
+    survivors = select_surviving_domains({
+        'Food': RouteQuality('structured', False, 1),
+        'Registlets': RouteQuality('content', True, 9),
+    })
+    assert survivors == frozenset({'Food'})
+
+
+def test_equal_quality_routes_can_coexist() -> None:
+    survivors = select_surviving_domains({
+        'Items': RouteQuality('structured', True, 2),
+        'Skills': RouteQuality('structured', True, 2),
+    })
+    assert survivors == frozenset({'Items', 'Skills'})
+
+
+def test_result_count_is_not_part_of_route_selection() -> None:
+    survivors = select_surviving_domains({
+        'Skills': RouteQuality('exact', True, 1),
+        'Registlets': RouteQuality('content', True, 500),
+    })
+    assert survivors == frozenset({'Skills'})
 ```
 
-Keep the existing real `MAGIC: FINALE` regression and update its `search_database` call with the new source paths only if defaults are not used.
+Also add integration tests using temporary Food/Registlet files plus existing test DB factories for `food maxmp`, `std 220`, `restores mp`, and bare `maxmp`. Assert bare `maxmp` leaves `outcome.food` absent or with no Food results.
 
-- [ ] **Step 2: Run routing tests and confirm RED**
+- [ ] **Step 2: Confirm RED**
 
 ```bash
 pytest tests/test_universal_domains.py tests/test_real_databases.py -q
 ```
 
-Expected: failures because router still handles Items/Skills pairwise and does not know Food/Registlets/content.
+- [ ] **Step 3: Implement generic route selection and suppression**
 
-- [ ] **Step 3: Implement generic quality selection**
-
-Build a domain list such as:
+The pure selector is:
 
 ```python
-candidates = [
-    ('Items', items), ('Skills', skills), ('Food', food), ('Registlets', registlets),
-]
-active = [(domain, outcome) for domain, outcome in candidates if outcome is not None]
-best_key = max((outcome.route_quality.sort_key for _, outcome in active), default=RouteQuality().sort_key)
+def select_surviving_domains(qualities: dict[SearchDomain, RouteQuality]) -> frozenset[SearchDomain]:
+    if not qualities:
+        return frozenset()
+    best = max(quality.sort_key for quality in qualities.values())
+    return frozenset(domain for domain, quality in qualities.items() if quality.sort_key == best)
 ```
 
-Suppress an outcome only when `outcome.route_quality.sort_key < best_key`; keep equal keys. Implement one suppression helper per outcome type so existing Item fields such as `routing_confidence` stay valid, but do not encode any pairwise domain combinations.
+Evaluate all available domain services, compare only `RouteQuality`, and suppress lower-quality outcomes with one per-outcome replacement helper so required domain-specific fields remain valid. Do not add Item-vs-Skill, Skill-vs-Registlet, or other pair-specific branches.
 
-If Food is unavailable and `is_food_intent(query)` is true, or Registlets are unavailable and `is_stoodie_intent(query)` is true, skip weak unrelated results so the UI's domain-health warning is the only guidance.
+If Food is unavailable and `is_food_intent(query)` is true, or Registlets are unavailable and `is_stoodie_intent(query)` is true, return no weak unrelated results; the UI source-health warning supplies the domain error.
 
-For relationship enrichment, open `SkillRepository` only when both Skills and Registlets are healthy, build the index, and `dataclasses.replace(card, related_registlets=...)` for each Skill card.
+For Skill enrichment, obtain canonical Skill names through `SkillRepository.list_skill_names()`, build the relationship index from the loaded Registlets, and use `dataclasses.replace(card, related_registlets=index.by_skill.get(card.skill.name.casefold(), ()))`.
 
-- [ ] **Step 4: Run router + existing Item/Skill regressions GREEN**
+- [ ] **Step 4: Confirm GREEN across routing and existing search**
 
 ```bash
 pytest tests/test_universal_domains.py tests/test_real_databases.py tests/test_item_search.py tests/test_skill_search.py -q
@@ -603,7 +615,7 @@ git commit -m "refactor: generalize Universal domain routing"
 
 ---
 
-### Task 8: Render Food/Registlet results, Skill relations, modes, help, and app state
+### Task 8: Render new domains, Skill relations, modes, Search Help, and app state
 
 **Files:**
 - Create: `ui/food_cards.py`
@@ -616,16 +628,14 @@ git commit -m "refactor: generalize Universal domain routing"
 - Modify: `tests/test_ui_contract.py`
 
 **Interfaces:**
-- `render_food_results(outcome: FoodSearchOutcome, *, limit: int) -> str | None`.
-- `render_registlet_results(outcome: RegistletSearchOutcome, *, limit: int) -> str | None`.
-- Session state adds `food_limit=20`, `registlet_limit=20`; all four limits reset on mode change, new submission, correction fill, example fill, or chip removal.
-- Sidebar modes exactly `Universal`, `Items`, `Skills`, `Food`, `Registlets`.
+- `render_food_results(outcome: FoodSearchOutcome, *, limit: int) -> str | None`
+- `render_registlet_results(outcome: RegistletSearchOutcome, *, limit: int) -> str | None`
+- Session state adds `food_limit=20` and `registlet_limit=20`.
+- Sidebar modes are exactly `Universal`, `Items`, `Skills`, `Food`, `Registlets`.
 
 - [ ] **Step 1: Write failing UI/state/help tests**
 
-Extend `tests/test_app_shell.py` to assert all five radio options exist, Food/Registlet limit reset is fill-only, and example buttons such as `food maxmp` do not set a submission nonce.
-
-Extend `tests/test_ui_contract.py` with source checks:
+Add:
 
 ```python
 def test_sidebar_help_documents_food_and_registlet_rules() -> None:
@@ -644,17 +654,17 @@ def test_main_keeps_four_independent_result_limits() -> None:
         assert key in source
 ```
 
-Also assert `ui/skill_dialog.py` renders `Related Registlets` when `card.related_registlets` is non-empty.
+Extend AppTest coverage to assert the radio contains five modes, clicking `food maxmp` only changes `session_state['query']`, chip removal resets all four limits, and `last_submission_nonce` is unchanged by fill-only interactions. Add a Skill-dialog contract asserting `Related Registlets` is rendered when the tuple is non-empty.
 
-- [ ] **Step 2: Run UI tests and confirm RED**
+- [ ] **Step 2: Confirm RED**
 
 ```bash
 pytest tests/test_app_shell.py tests/test_ui_contract.py -q
 ```
 
-- [ ] **Step 3: Implement UI integration with no auto-search path**
+- [ ] **Step 3: Implement UI wiring without adding an auto-search path**
 
-Food rendering groups visible entries by level after the service has already sorted them. Registlet cards show name, max level, effect, source levels, and explicit affected Skills. Skill dialog adds:
+Food cards group already-sorted visible entries by level and list codes. Registlet cards show name, max level, effect, Stoodie source levels, and explicit affected Skills. Skill dialog adds:
 
 ```python
 if card.related_registlets:
@@ -663,20 +673,43 @@ if card.related_registlets:
         st.write(name)
 ```
 
-In `main.py`, replace the two-health `can_search` calculation with per-domain health. Dedicated modes require their own domain. Universal remains enabled when at least one domain is healthy and shows warnings for each unavailable domain. Pass `available_domains` into router/autocomplete.
-
-Keep this invariant around every fill-only path:
+In `main.py`, initialize all limits together:
 
 ```python
-st.session_state.query = fill_value
-st.session_state.last_outcome = None
-# reset all four limits
-st.rerun()
+for key, value in {
+    'query': '', 'last_submission_nonce': None, 'last_outcome': None,
+    'last_mode': 'Universal', 'item_limit': 20, 'skill_limit': 20,
+    'food_limit': 20, 'registlet_limit': 20,
+}.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 ```
 
-Never assign `query_to_run` from examples, suggestions, corrections, autocomplete, or chip-removal paths.
+On every mode change, example fill, correction fill, chip removal, or new explicit submission, assign all four limits back to `20`. Keep the current `query_to_run` rule unchanged: only a new `SearchSubmission.nonce` assigns `query_to_run`.
 
-- [ ] **Step 4: Run UI and domain tests GREEN**
+Dedicated modes require their own health. Universal remains searchable when at least one domain is healthy and renders warnings for each unavailable domain. Pass `available_domains` to both router and autocomplete.
+
+Search Help must explicitly state:
+
+```text
+Food Code Search
+Start the query with "food" or "code", followed by a Food stat.
+food maxmp
+code ampr
+food critical rate
+food dt fire
+food -aggro
+Code values themselves are not searchable.
+
+Registlet Search
+Search by Stoodie level: std 220, stoodie lvl 220
+Search by Registlet name: Arrow Rain Enhancer
+Search by effect: restores mp, physical pierce, inflicts stun
+```
+
+Also explain that Registlet effect matches are weaker than exact/structured matches in Universal.
+
+- [ ] **Step 4: Confirm GREEN**
 
 ```bash
 pytest tests/test_app_shell.py tests/test_ui_contract.py tests/test_food_search.py tests/test_registlet_search.py -q
@@ -691,20 +724,18 @@ git commit -m "feat: integrate Food and Registlet UI"
 
 ---
 
-### Task 9: Update docs, validate committed data, and run full verification
+### Task 9: Validate committed data, update README, and run full verification
 
 **Files:**
 - Modify: `README.md`
 - Modify: `tests/test_real_databases.py`
-- No changes allowed: `items.sqlite`, `skills.sqlite`, `food_entries.csv`, `food_stat_aliases.json`, `registlets.json` unless a failing validation test proves a user-data defect that must be discussed separately.
+- Do not modify: `items.sqlite`, `skills.sqlite`, `food_entries.csv`, `food_stat_aliases.json`, `registlets.json` unless a validation failure proves a source-data defect and that defect is discussed separately.
 
 **Interfaces:**
-- README describes four searchable domains, Food prefix syntax, Registlet routes, source files, and deterministic/no-LLM behavior.
-- Real-data tests exercise current committed Food and Registlet files rather than only fixtures.
+- README documents all four searchable domains plus five UI modes, exact Food prefix syntax, Registlet search routes, source files, and deterministic/no-LLM behavior.
+- Real-data tests exercise the committed Food/Registlet files as well as the existing SQLite regressions.
 
-- [ ] **Step 1: Add real-source acceptance tests before documentation changes**
-
-Add tests equivalent to:
+- [ ] **Step 1: Add real-source acceptance tests**
 
 ```python
 def test_committed_food_sources_support_prefixed_search() -> None:
@@ -719,17 +750,17 @@ def test_committed_registlets_support_stoodie_and_effect_search() -> None:
     assert service.search('restores mp').results
 ```
 
-Also add a real Universal regression proving `food maxmp` returns Food without unrelated weak domains and a bare `maxmp` has no Food outcome/results.
+Add a real Universal test asserting `food maxmp` has Food results and no surviving weak unrelated results. Add a bare `maxmp` assertion that Food does not participate. Keep the existing `MAGIC: FINALE` exact-Skill regression.
 
-- [ ] **Step 2: Run acceptance tests and confirm current status**
+- [ ] **Step 2: Run real-source tests before docs**
 
 ```bash
 pytest tests/test_real_databases.py -q
 ```
 
-If any failure is caused by malformed user-maintained Food/Registlet source data, stop implementation of that specific data-dependent assertion and report the exact row/record warning rather than silently changing the source.
+If a failure identifies malformed user-maintained Food/Registlet data, report the exact row/record warning and do not silently repair source data as part of search code.
 
-- [ ] **Step 3: Update README with exact supported syntax**
+- [ ] **Step 3: Update README**
 
 Document these examples verbatim:
 
@@ -741,11 +772,9 @@ Arrow Rain Enhancer
 restores mp
 ```
 
-State that bare numeric Food codes are not searchable and that Registlet effect search is deterministic text matching, not semantic/AI search.
+State that raw Food codes are not searchable and Registlet effect search is deterministic text matching, not semantic/AI search.
 
-- [ ] **Step 4: Run complete verification**
-
-Run:
+- [ ] **Step 4: Run complete verification on the final head**
 
 ```bash
 pytest -q
@@ -753,41 +782,33 @@ python -m compileall -q main.py toram_search ui
 git diff --exit-code -- items.sqlite skills.sqlite
 ```
 
-Then compare the committed SQLite blob SHAs against the pre-feature values:
+Confirm GitHub blob SHAs remain:
 
 ```text
 items.sqlite  7dd6fe9e128adfde0ca47852dcb3792852245f78
 skills.sqlite 5aaa1ae70f26a92aaa8289d1426face69e72a797
 ```
 
-Expected: all tests pass, compileall emits no errors, SQLite diff is empty, and both blob SHAs are unchanged.
+Expected: full pytest pass, no compile errors, empty SQLite diff, unchanged SQLite blob SHAs.
 
-- [ ] **Step 5: Commit the final docs/regressions**
+- [ ] **Step 5: Commit docs/regressions, then verify once more**
 
 ```bash
 git add README.md tests/test_real_databases.py
 git commit -m "docs: document Food and Registlet search"
+pytest -q
+python -m compileall -q main.py toram_search ui
 ```
-
-After this commit, run the full verification commands once more on the exact final head before opening a PR or claiming completion.
 
 ---
 
-## Review Checkpoints During Execution
+## Review Checkpoints
 
-After Tasks 1, 3, 4, 7, and 8, perform a focused code review before continuing. Each checkpoint must confirm:
-
-- the task matches this plan/spec rather than adding unrelated refactors;
-- tests demonstrated RED before production changes and GREEN afterward;
-- no source-data or SQLite file changed accidentally;
-- no UI interaction added an auto-search path;
-- route quality remains deterministic and result count is never a routing signal.
+After Tasks 1, 3, 4, 7, and 8, review the task before continuing. Confirm the committed diff matches the task, RED was observed before implementation, focused tests are GREEN, source/SQLite data did not change accidentally, fill-only UI paths remain non-submitting, and route selection never uses result count.
 
 ## Final Acceptance Matrix
 
-Before completion, map the final test suite to every design requirement:
-
-- Food loader/key/display/alias normalization and duplicate collapse: `tests/test_food_data.py`.
+- Food loading, aliases, validation, duplicate collapse: `tests/test_food_data.py`.
 - Food prefix gate, code non-searchability, ordering, suggestions, chip: `tests/test_food_search.py`.
 - Registlet source validation: `tests/test_registlet_data.py`.
 - Stoodie aliases, exact/fuzzy names, phrase/all-token effects: `tests/test_registlet_search.py`.
@@ -795,5 +816,5 @@ Before completion, map the final test suite to every design requirement:
 - Four-domain routing/suppression/unavailable-domain behavior: `tests/test_universal_domains.py`.
 - Shared `content` quality and new chip/domain types: `tests/test_interpretation.py`.
 - Source health: `tests/test_database.py`.
-- Five modes, independent limits, fill-only behavior, Help text: `tests/test_app_shell.py` and `tests/test_ui_contract.py`.
+- Five modes, four independent limits, fill-only behavior, Search Help: `tests/test_app_shell.py`, `tests/test_ui_contract.py`.
 - Current committed data and `MAGIC: FINALE` regression: `tests/test_real_databases.py`.
