@@ -49,8 +49,17 @@ In Universal mode, Registlet effect matches are weaker than exact or structured 
 """
             )
 
-        st.divider()
-        st.caption("Deterministic Toram Online database search.")
-        st.markdown("**Data credits:** Coryn Club and project-maintained Toram data.")
+        st.caption("Toram Online database search.")
+
+        st.markdown("""
+        **Credits & Disclaimer**
+
+        - Skill descriptions are sourced from **Phantom's Library**.
+        - Skill icons, item images, stats, and effects are sourced from **Coryn Club**.
+
+        This is an **unofficial fan-made website** and is not affiliated with, endorsed by, or sponsored by **ASOBIMO, Inc.**  
+        Toram Online and all related game content and assets are the property of **ASOBIMO, Inc.**
+        """)
+
         st.markdown("[GitHub](https://github.com/KarenYuusha/toram-item-search)")
     return mode
