@@ -34,7 +34,7 @@ class ItemSearchService:
             return None,choices
         best=None; score=0
         for name in self.repository.list_stat_names():
-            s=float(fuzz.WRatio(expanded,normalize_stat_text(name)))
+            s=float(fuzz.ratio(expanded,normalize_stat_text(name)))
             if s>score: best,score=name,s
         return (best,()) if best and score>=88 else (None,())
     @staticmethod

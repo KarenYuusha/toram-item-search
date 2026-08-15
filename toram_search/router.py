@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
+from toram_search.interpretation import RouteQuality
 from toram_search.items.service import ItemSearchService
 from toram_search.models import DatabaseMode, UniversalSearchOutcome
 from toram_search.skills.service import SkillSearchService
@@ -21,6 +23,24 @@ def _search_skills(query: str, path: Path, *, allow_weak_fallback: bool = True):
         return service.search(query, allow_weak_fallback=allow_weak_fallback)
     finally:
         service.close()
+
+
+def _suppress_weak_items_for_strong_skill(items, skills):
+    skill_is_strong_result = (
+        skills.route_quality.family in {'exact', 'structured'}
+        and skills.route_quality.has_results
+    )
+    if not skill_is_strong_result or items.route_quality.family != 'weak':
+        return items
+    return replace(
+        items,
+        kind='not_found',
+        results=(),
+        message='No matching item or stat found.',
+        routing_confidence='none',
+        interpretation=None,
+        route_quality=RouteQuality(),
+    )
 
 
 def select_winning_interpretation(items, skills):
@@ -48,6 +68,7 @@ def search_database(
             skills_path,
             allow_weak_fallback=items.routing_confidence != 'strong',
         )
+        items = _suppress_weak_items_for_strong_skill(items, skills)
         return UniversalSearchOutcome(
             query=query,
             items=items,
