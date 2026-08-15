@@ -13,6 +13,7 @@ ALL_CRYSTA_TYPES = (
     "Special Crysta", "Enhancer Crysta (Red)", "Enhancer Crysta (Purple)",
     "Enhancer Crysta (Green)", "Enhancer Crysta (Yellow)", "Enhancer Crysta (Blue)",
 )
+REGISTLET_ITEM_TYPES = frozenset({"regislet", "registlet"})
 ITEM_WORD_ALIASES = {"crystal": "xtal", "crysta": "xtal", "xtall": "xtal"}
 ITEM_TYPE_ALIASES = {
     "1h": "1 Handed Sword", "ohs": "1 Handed Sword",
@@ -76,6 +77,10 @@ def expand_stat_aliases(value: str) -> str:
 
 def is_crysta_item_type(item_type: str) -> bool:
     return "crysta" in normalize_name(item_type).split()
+
+
+def is_registlet_item_type(item_type: str | None) -> bool:
+    return str(item_type or '').strip().casefold() in REGISTLET_ITEM_TYPES
 
 
 def resolve_stat_term(text: str, available_stats: Iterable[str]) -> tuple[str | None, tuple[str, ...], bool]:

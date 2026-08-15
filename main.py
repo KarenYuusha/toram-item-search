@@ -71,11 +71,11 @@ for health in visible_health:
 can_search=bool(available_domains) if mode=='Universal' else mode in available_domains
 
 examples={
-    'Universal':('critical rate','Guardian','food maxmp','std 220','restores mp'),
-    'Items':('cr bow','hp >= 5000 armor','-aggro xtal','highest cr'),
-    'Skills':('Guardian','Shield Skills','skills that inflict stun','lowest mp shield skills'),
-    'Food':('food maxmp','code ampr','food dt fire','food -aggro'),
-    'Registlets':('std 220','Arrow Rain Enhancer','restores mp','physical pierce'),
+    'Universal':('critical rate','food maxmp','physical pierce'),
+    'Items':('cr bow','hp >= 5000 armor','highest cr'),
+    'Skills':('Guardian','Shield Skills','skills that inflict stun'),
+    'Food':('food maxmp','code ampr','food dt fire'),
+    'Registlets':('std 220','Arrow Rain Enhancer','physical pierce'),
 }[mode]
 st.caption('Suggested searches'); example_columns=st.columns(len(examples)); example_query=None
 for column,example in zip(example_columns,examples):
@@ -124,6 +124,14 @@ placeholders={
     'Food':'Start with food or code...',
     'Registlets':'Search Stoodie level, name, or effect...',
 }
+syntax_hints={
+    'Universal':'Try: cr bow · food maxmp · std 220 · physical pierce',
+    'Items':'Try: item name · cr bow · hp >= 5000 armor',
+    'Skills':'Try: Guardian · Shield Skills · skills that inflict stun',
+    'Food':'Start with food/code: food maxmp · code ampr',
+    'Registlets':'Try: std 220 · Arrow Rain Enhancer · physical pierce',
+}
+st.caption(syntax_hints[mode])
 submission=render_search_box(value=st.session_state.query,suggestions=suggestions,placeholder=placeholders[mode],disabled=not can_search)
 
 query_to_run=None

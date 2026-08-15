@@ -7,7 +7,7 @@ from rapidfuzz import fuzz
 
 from toram_search.interpretation import QueryChip, QueryInterpretation, RouteQuality
 from .data import load_registlet_dataset
-from .models import RegistletRecord, RegistletSearchOutcome
+from .models import RegistletMatch, RegistletRecord, RegistletSearchOutcome
 
 _STOODIE_INTENT = re.compile(r'^\s*(?:std|stoodie)(?:\s+|$)', re.IGNORECASE)
 _STOODIE_QUERY = re.compile(
@@ -92,6 +92,7 @@ class RegistletSearchService:
             message=None if results else f'No Registlets are listed for Stoodie Lv{level}.',
             interpretation=interpretation,
             route_quality=RouteQuality('structured', bool(results), 1),
+            match=RegistletMatch('stoodie', str(level)) if results else None,
         )
 
     def _effect_matches(self, raw: str) -> tuple[RegistletRecord, ...]:
@@ -148,6 +149,7 @@ class RegistletSearchService:
                 query=raw,
                 results=tuple(sorted(exact, key=lambda record: (record.name.casefold(), record.name))),
                 route_quality=RouteQuality('exact', True, 1),
+                match=RegistletMatch('name'),
             )
 
         effect_hits = self._effect_matches(raw)
@@ -157,6 +159,7 @@ class RegistletSearchService:
                 query=raw,
                 results=effect_hits,
                 route_quality=RouteQuality('content', True, len(_normalize_effect(raw).split())),
+                match=RegistletMatch('effect', _normalize_effect(raw)),
             )
 
         fuzzy_hits = self._fuzzy_name_matches(raw)
@@ -166,6 +169,7 @@ class RegistletSearchService:
                 query=raw,
                 results=fuzzy_hits,
                 route_quality=RouteQuality('weak', True, 1),
+                match=RegistletMatch('fuzzy_name'),
             )
 
         return RegistletSearchOutcome(

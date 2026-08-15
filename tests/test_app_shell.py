@@ -27,9 +27,9 @@ def test_app_defaults_to_universal_mode_and_has_five_modes() -> None:
 
 def test_example_button_fills_query_without_searching() -> None:
     app = AppTest.from_file(APP_PATH).run(timeout=10)
-    target = next(button for button in app.button if button.label == 'Guardian')
+    target = next(button for button in app.button if button.label == 'critical rate')
     target.click().run(timeout=10)
-    assert app.session_state['query'] == 'Guardian'
+    assert app.session_state['query'] == 'critical rate'
     assert app.session_state['last_outcome'] is None
 
 

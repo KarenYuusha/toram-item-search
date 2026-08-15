@@ -144,3 +144,19 @@ def test_registlet_autocomplete_contains_names_only(registlet_file: Path) -> Non
 
     assert ('Arrow Rain Enhancer', 'Registlet') in values
     assert not any(value == 'restores mp' for value, _ in values)
+
+
+def test_success_routes_expose_match_metadata(registlet_file: Path) -> None:
+    stoodie = RegistletSearchService(registlet_file).search('std lvl220')
+    exact = RegistletSearchService(registlet_file).search('Arrow Rain Enhancer')
+    effect = RegistletSearchService(registlet_file).search('  Physical   Pierce  ')
+    fuzzy = RegistletSearchService(registlet_file).search('Arrow Rain Enhancerr')
+
+    assert stoodie.match is not None
+    assert exact.match is not None
+    assert effect.match is not None
+    assert fuzzy.match is not None
+    assert (stoodie.match.kind, stoodie.match.detail) == ('stoodie', '220')
+    assert (exact.match.kind, exact.match.detail) == ('name', None)
+    assert (effect.match.kind, effect.match.detail) == ('effect', 'physical pierce')
+    assert (fuzzy.match.kind, fuzzy.match.detail) == ('fuzzy_name', None)

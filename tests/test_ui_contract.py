@@ -80,6 +80,12 @@ def test_sidebar_help_documents_food_and_registlet_rules() -> None:
     assert 'restores mp' in source
 
 
+def test_help_names_registlet_json_as_source_of_truth() -> None:
+    source = text('ui/sidebar.py')
+    assert 'registlets.json' in source
+    assert 'not the Item database' in source
+
+
 def test_main_uses_independent_four_source_health() -> None:
     source = text('main.py')
     assert 'validate_sources' in source
@@ -89,11 +95,27 @@ def test_main_uses_independent_four_source_health() -> None:
     assert 'REGISTLET_DATA' in source
 
 
+def test_suggested_search_density_is_small_and_static() -> None:
+    source = text('main.py')
+    assert "'Universal':('critical rate','food maxmp','physical pierce')" in source
+    assert "'Items':('cr bow','hp >= 5000 armor','highest cr')" in source
+    assert "'Skills':('Guardian','Shield Skills','skills that inflict stun')" in source
+    assert "'Food':('food maxmp','code ampr','food dt fire')" in source
+    assert "'Registlets':('std 220','Arrow Rain Enhancer','physical pierce')" in source
+
+
 def test_main_has_new_domain_suggested_searches() -> None:
     source = text('main.py')
     assert 'food maxmp' in source
     assert 'std 220' in source
-    assert 'restores mp' in source
+    assert 'physical pierce' in source
+
+
+def test_compact_syntax_hint_is_before_search_input() -> None:
+    source = text('main.py')
+    assert 'syntax_hints=' in source
+    assert 'Try: cr bow · food maxmp · std 220 · physical pierce' in source
+    assert source.index('st.caption(syntax_hints[mode])') < source.index('submission=render_search_box')
 
 
 def test_new_domain_result_renderers_are_wired() -> None:
@@ -111,12 +133,31 @@ def test_food_cards_group_codes_by_level() -> None:
     assert 'Lv.' in source
 
 
+def test_food_cards_keep_highest_level_grouping_and_code_copy_affordance() -> None:
+    source = text('ui/food_cards.py')
+    assert 'for level in sorted(grouped, reverse=True)' in source
+    assert 'st.code(code, language=None)' in source
+
+
 def test_registlet_cards_show_effect_sources_and_affected_skills() -> None:
     source = text('ui/registlet_cards.py')
     assert 'Max Lv.' in source
     assert 'effect' in source
     assert 'source_levels' in source
     assert 'Affected Skills' in source
+
+
+def test_registlet_cards_render_match_reason_and_level_badges() -> None:
+    source = text('ui/registlet_cards.py')
+    assert 'Matched by name' in source
+    assert 'Matched by effect:' in source
+    assert 'Matched by Stoodie Lv' in source
+    assert 'Matched by fuzzy name' in source
+    assert ':gray-badge[Lv' in source
+
+
+def test_registlet_results_pass_outcome_match_to_cards() -> None:
+    assert 'match=outcome.match' in text('ui/results.py')
 
 
 def test_skill_dialog_renders_related_registlets() -> None:

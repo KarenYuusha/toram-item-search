@@ -76,6 +76,8 @@ def _suppress_outcome(domain: SearchDomain, outcome):
     }
     if domain == 'Items':
         return replace(outcome, routing_confidence='none', **common)
+    if domain == 'Registlets':
+        return replace(outcome, match=None, **common)
     return replace(outcome, **common)
 
 
