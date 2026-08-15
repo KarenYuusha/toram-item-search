@@ -123,3 +123,13 @@ def test_unavailable_explicit_food_intent_does_not_show_weak_unrelated_results()
     assert outcome.items is None or not outcome.items.results
     assert outcome.skills is None or not outcome.skills.results
     assert outcome.registlets is None or not outcome.registlets.results
+
+
+def test_suppressed_registlet_outcome_clears_match_metadata() -> None:
+    outcome = _search('Arrow Rain')
+
+    assert outcome.skills is not None
+    assert outcome.skills.route_quality.family == 'exact'
+    assert outcome.registlets is not None
+    assert not outcome.registlets.results
+    assert outcome.registlets.match is None
