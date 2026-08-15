@@ -167,7 +167,14 @@ class ItemSearchService:
             )
         if recognized_structured_intent:
             specificity=max(1,int(item_filter is not None) + int(rank_direction is not None) + int(stat is not None) + len(stat_hits))
-            return finish('suggest',message=f'I could not safely parse "{raw}".',routing_confidence='strong',family='structured',specificity=specificity)
+            alias_only_partial=bool(stat_hits) and item_filter is None and rank_direction is None and stat is None
+            return finish(
+                'suggest',
+                message=f'I could not safely parse "{raw}".',
+                routing_confidence='none' if alias_only_partial else 'strong',
+                family='none' if alias_only_partial else 'structured',
+                specificity=0 if alias_only_partial else specificity,
+            )
         ranked=self.repository.fuzzy_items(raw)
         if ranked:return finish('results',tuple(ItemCardResult(i,score=s,match_kind=k) for i,s,k in ranked),routing_confidence='weak',family='weak')
         return finish('not_found',message='No matching item or stat found.')
