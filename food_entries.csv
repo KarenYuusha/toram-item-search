@@ -1,0 +1,8 @@
+code	stat	level
+4010090	maxmp	10
+4010090	int	10
+4010090	stronger_against_light_pct	8
+1010071	dex	10
+1010071	stronger_against_dark_pct	8
+1010081	physical_resistance_pct	10
+1010081	magic_resistance_pct	8
