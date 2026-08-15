@@ -26,7 +26,7 @@ The Item repository must treat these item types as excluded, case-insensitively:
 - `Regislet`
 - `Registlet`
 
-Whitespace around the value should not affect the exclusion.
+Whitespace around the value does not affect the exclusion.
 
 Excluded rows are treated as if they do not exist in the Item domain.
 
@@ -57,7 +57,9 @@ The filter applies to:
 - Universal Item routing;
 - upgrade predecessor/successor lookups when the referenced row is excluded.
 
-`get_item()` must not expose an excluded Registlet row through normal Item UI flows. If called directly for an excluded id, it should behave as unavailable to the Item domain rather than rendering it as an Item.
+`get_item()` must not expose an excluded Registlet row. Direct `get_item()` access to an excluded id raises `KeyError`, the same as an id unavailable to the Item domain.
+
+Upgrade predecessor/successor lists omit excluded Registlet rows entirely; they must not turn those filtered references into `Unknown item` placeholders.
 
 The database remains read-only and unchanged.
 
@@ -83,16 +85,16 @@ Examples:
 
 ### 5.1 Match reason
 
-Each Registlet result should explain why it matched when that information is useful.
+Each Registlet result explains why it matched.
 
 Supported labels:
 
 - `Matched by name`
-- `Matched by effect`
+- `Matched by effect: <normalized query>`
 - `Matched by Stoodie Lv<N>`
-- `Matched by fuzzy name` for the typo fallback
+- `Matched by fuzzy name`
 
-For effect searches, the result may additionally show the normalized search phrase, for example:
+For example, an effect search for `physical pierce` displays:
 
 `Matched by effect: physical pierce`
 
@@ -100,7 +102,7 @@ The label is explanatory UI metadata only. It must not change ranking or search 
 
 ### 5.2 Stoodie levels
 
-Stoodie source levels should be shown as compact, visually scannable level badges/chips rather than a long undifferentiated text line.
+Stoodie source levels are shown as compact, visually scannable level badges/chips rather than a long undifferentiated text line.
 
 Example:
 
@@ -110,7 +112,7 @@ The underlying source levels and ordering remain unchanged.
 
 ### 5.3 Result card hierarchy
 
-A Registlet card should prioritize information in this order:
+A Registlet card prioritizes information in this order:
 
 1. Registlet name
 2. match reason
@@ -119,13 +121,13 @@ A Registlet card should prioritize information in this order:
 5. Stoodie source levels
 6. affected Skills, when present
 
-No effect text should be rewritten or inferred.
+No effect text is rewritten or inferred.
 
 ## 6. Food result UX
 
 ### 6.1 Group by Food level
 
-Food results for a stat should be grouped by Food level, highest level first.
+Food results for a stat are grouped by Food level, highest level first.
 
 Example:
 
@@ -144,11 +146,11 @@ Multiple codes at the same level remain separate entries.
 
 ### 6.2 Copy-code action
 
-Each displayed Food code should provide an explicit copy action where the Streamlit UI can do so reliably.
+Each displayed Food code provides an explicit copy action.
 
 The copy action copies only the numeric Food code. It must not trigger a search, change the query, or clear results.
 
-If a native Streamlit clipboard control is unavailable, the implementation may use the smallest existing-compatible UI mechanism needed to provide the same behavior; it must not add a large frontend framework.
+If the pinned Streamlit version has no suitable native clipboard control, the implementation uses the smallest existing-compatible UI mechanism needed to provide the action. It must not add a large frontend framework.
 
 ## 7. Suggested-search UX
 
@@ -156,36 +158,36 @@ The current Universal page shows many suggested-search buttons at once. Reduce t
 
 ### 7.1 Universal
 
-Show three representative examples rather than five. They should cover different domains, for example:
+Show exactly three representative examples rather than five. The three examples together cover different domains:
 
-- an Item/stat query;
-- a Food or Stoodie query;
-- a Skill or Registlet-effect query.
+- one Item/stat query;
+- one Food or Stoodie query;
+- one Skill or Registlet-effect query.
 
-The exact examples may rotate only if deterministic. A static set is preferred for the first implementation.
+Use a static deterministic set for the first implementation.
 
 ### 7.2 Domain modes
 
-Keep domain-specific examples, but limit the visible set to a small number that fits comfortably on typical desktop and mobile widths.
+Keep domain-specific examples, with at most three visible examples per mode so they fit more comfortably on desktop and mobile widths.
 
 All example buttons remain fill-only. Clicking an example must never execute a search automatically.
 
 ## 8. Search guidance near the input
 
-Keep the full Search Help in the sidebar, but add a short syntax hint near the search box so users do not have to open Help for common patterns.
+Keep the full Search Help in the sidebar, and add a short syntax hint near the search box so users do not have to open Help for common patterns.
 
 Example Universal hint:
 
 `Try: cr bow · food maxmp · std 220 · physical pierce`
 
-The hint is informational only and should remain compact.
+The hint is informational only and remains compact.
 
 The existing Help text must continue to explain:
 
 - Food searches must begin with `food` or `code`;
 - Food codes are results, not searchable input;
 - Registlets can be searched by Stoodie level, name, or effect;
-- Registlet data comes from the Registlet source rather than the Item database.
+- Registlet data comes from `registlets.json`, not the Item database.
 
 ## 9. Error handling and source health
 
@@ -214,9 +216,11 @@ Tests must prove that `Regislet` and `Registlet` item types are excluded case-in
 - item counts;
 - item-type lists;
 - autocomplete;
-- Universal Item results.
+- Universal Item results;
+- direct `get_item()` access;
+- upgrade predecessor/successor display.
 
-A fixture should include a normal Item and a contaminated Registlet row with overlapping searchable content to prove the filter is not only cosmetic.
+A fixture includes a normal Item and a contaminated Registlet row with overlapping searchable content to prove the filter is not only cosmetic.
 
 ### 10.2 Registlet source authority
 
@@ -229,14 +233,17 @@ Tests must prove that:
 
 ### 10.3 UX contracts
 
-Tests should cover:
+Tests cover:
 
 - Registlet match-reason metadata for name, effect, Stoodie, and fuzzy-name routes;
+- effect match metadata carries the normalized effect query used for the label;
 - Stoodie levels are exposed to the renderer as discrete values;
 - Food results are grouped highest-level-first;
+- every displayed Food code has a copy action;
 - Food copy action does not submit a new search;
 - suggested-search examples remain fill-only;
-- Universal suggested searches are reduced from the current crowded set;
+- Universal shows exactly three suggested searches;
+- each domain mode shows at most three suggested searches;
 - the near-search syntax hint and sidebar Help include the approved Food and Registlet rules.
 
 ### 10.4 Existing regressions
@@ -274,6 +281,6 @@ Expected implementation areas are limited to:
 - suggested-search and help/hint UI;
 - focused regression tests.
 
-The router should change only if a small interface adjustment is required to carry Registlet match metadata. It should not regain domain-specific contamination filtering.
+The router changes only if a small interface adjustment is required to carry Registlet match metadata. It must not regain domain-specific contamination filtering.
 
 `items.sqlite`, `skills.sqlite`, `food_entries.csv`, `food_stat_aliases.json`, and `registlets.json` must remain unchanged by this feature.
