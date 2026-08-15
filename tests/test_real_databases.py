@@ -1,8 +1,18 @@
 import pytest
 
-from toram_search.database import ITEM_DATABASE, SKILL_DATABASE, validate_databases
+from toram_search.database import (
+    FOOD_ALIASES,
+    FOOD_ENTRIES,
+    ITEM_DATABASE,
+    REGISTLET_DATA,
+    SKILL_DATABASE,
+    validate_databases,
+    validate_sources,
+)
+from toram_search.food.service import FoodSearchService
 from toram_search.items.repository import ItemRepository
 from toram_search.items.service import ItemSearchService
+from toram_search.registlets.service import RegistletSearchService
 from toram_search.router import search_database
 from toram_search.skills.repository import SkillRepository
 from toram_search.skills.service import SkillSearchService
@@ -13,6 +23,11 @@ pytestmark = pytest.mark.skipif(not REAL_DATABASES_AVAILABLE, reason='committed 
 
 def test_committed_databases_pass_public_schema_validation() -> None:
     health = validate_databases()
+    assert all(row.ok for row in health), health
+
+
+def test_all_committed_sources_pass_public_validation() -> None:
+    health = validate_sources()
     assert all(row.ok for row in health), health
 
 
@@ -41,6 +56,28 @@ def test_committed_databases_support_representative_searches() -> None:
         skill_service.close()
     assert item_outcome.results
     assert any(row.skill.name.casefold() == 'guardian' for row in skill_outcome.results)
+
+
+def test_committed_food_sources_support_prefixed_search() -> None:
+    outcome = FoodSearchService(FOOD_ENTRIES, FOOD_ALIASES).search('food maxmp')
+
+    assert outcome.results
+    assert outcome.route_quality.family == 'structured'
+    assert [row.level for row in outcome.results] == sorted(
+        (row.level for row in outcome.results), reverse=True
+    )
+
+
+def test_committed_registlets_support_stoodie_and_effect_search() -> None:
+    service = RegistletSearchService(REGISTLET_DATA)
+
+    stoodie = service.search('std 220')
+    effect = service.search('restores mp')
+
+    assert stoodie.results
+    assert stoodie.route_quality.family == 'structured'
+    assert effect.results
+    assert effect.route_quality.family == 'content'
 
 
 def test_real_universal_aggro_xtal_wp_suppresses_unrelated_skills() -> None:
@@ -104,3 +141,33 @@ def test_real_exact_magic_finale_suppresses_weak_item_fallback() -> None:
     assert outcome.skills.route_quality.family == 'exact'
     assert outcome.items is not None
     assert not outcome.items.results
+
+
+def test_real_universal_food_query_returns_food_without_weak_leakage() -> None:
+    outcome = search_database(
+        'Universal',
+        'food maxmp',
+        items_path=ITEM_DATABASE,
+        skills_path=SKILL_DATABASE,
+    )
+
+    assert outcome.food is not None
+    assert outcome.food.results
+    assert outcome.interpretation is not None
+    assert outcome.interpretation.domain == 'Food'
+    assert outcome.items is None or not outcome.items.results
+    assert outcome.skills is None or not outcome.skills.results
+    assert outcome.registlets is None or not outcome.registlets.results
+
+
+def test_real_bare_maxmp_never_activates_food() -> None:
+    outcome = search_database(
+        'Universal',
+        'maxmp',
+        items_path=ITEM_DATABASE,
+        skills_path=SKILL_DATABASE,
+    )
+
+    assert outcome.food is not None
+    assert outcome.food.route_quality.family == 'none'
+    assert outcome.food.results == ()
