@@ -52,3 +52,24 @@ def create_item_database(path: Path) -> None:
     db.execute("INSERT INTO item_sources VALUES (1,1,0,10,'Test Monster',100,'Test Map',NULL,'https://example.com/monster',NULL,'[]')")
     db.execute("INSERT INTO item_images VALUES (1,1,0,'main',NULL,NULL,NULL,'https://example.com/test-bow.png')")
     db.commit(); db.close()
+
+
+def add_registlet_contamination(path: Path) -> None:
+    db = sqlite3.connect(path)
+    db.executemany(
+        'INSERT INTO items VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+        [
+            (90, 1, 'Pierce Regislet Item', ' Regislet ', 0, None, None, None, None, None, 'https://example.com/regislet', ''),
+            (91, 1, 'Critical Registlet Item', 'REGISTLET', 0, None, None, None, None, None, 'https://example.com/registlet-2', ''),
+        ],
+    )
+    db.executemany(
+        'INSERT INTO item_stats VALUES (?,?,?,?,?,?,?,?,?)',
+        [
+            (90, 90, 0, 'Physical Pierce %', 99, '[]', None, None, 0),
+            (91, 91, 0, 'Critical Rate', 999, '[]', None, None, 0),
+            (92, 5, 1, 'Upgrade for', 90, '[]', None, None, 0),
+        ],
+    )
+    db.commit()
+    db.close()
