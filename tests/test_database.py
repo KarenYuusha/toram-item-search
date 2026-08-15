@@ -1,9 +1,16 @@
+import json
 import sqlite3
 from pathlib import Path
 
 import pytest
 
-from toram_search.database import connect_readonly, validate_item_database, validate_skill_database
+from toram_search.database import (
+    connect_readonly,
+    validate_food_sources,
+    validate_item_database,
+    validate_registlet_source,
+    validate_skill_database,
+)
 
 
 def make_db(path: Path) -> None:
@@ -60,4 +67,61 @@ def test_skill_validation_does_not_require_embedding_table(tmp_path: Path) -> No
     connection.commit()
     connection.close()
     health = validate_skill_database(path)
+    assert health.ok is True
+
+
+def test_food_health_rejects_malformed_aliases(tmp_path: Path) -> None:
+    aliases = tmp_path / 'aliases.json'
+    entries = tmp_path / 'food.csv'
+    aliases.write_text('{broken', encoding='utf-8')
+    entries.write_text('code,stat,level\n111,maxmp,10\n', encoding='utf-8')
+
+    health = validate_food_sources(entries, aliases)
+
+    assert health.name == 'Food'
+    assert health.ok is False
+    assert health.error
+
+
+def test_food_health_allows_skipped_row_warnings(tmp_path: Path) -> None:
+    aliases = tmp_path / 'aliases.json'
+    entries = tmp_path / 'food.csv'
+    aliases.write_text(json.dumps({
+        'stats': [{'key': 'maxmp', 'display': 'MaxMP', 'aliases': ['max mp']}]
+    }), encoding='utf-8')
+    entries.write_text('code,stat,level\n111,unknown,10\n', encoding='utf-8')
+
+    health = validate_food_sources(entries, aliases)
+
+    assert health.name == 'Food'
+    assert health.ok is True
+
+
+def test_registlet_health_rejects_malformed_top_level_source(tmp_path: Path) -> None:
+    path = tmp_path / 'registlets.json'
+    path.write_text('{broken', encoding='utf-8')
+
+    health = validate_registlet_source(path)
+
+    assert health.name == 'Registlets'
+    assert health.ok is False
+    assert health.error
+
+
+def test_registlet_health_allows_skipped_record_warnings(tmp_path: Path) -> None:
+    path = tmp_path / 'registlets.json'
+    path.write_text(json.dumps({
+        'metadata': {'valid_stoodie_levels': [220]},
+        'registlets': [{
+            'name': '',
+            'max_lv': 1,
+            'effect': 'bad record',
+            'affects_skill': None,
+            'obtained_from': {'source': 'Stoodie', 'location': 'El Scaro', 'levels': [220]},
+        }],
+    }), encoding='utf-8')
+
+    health = validate_registlet_source(path)
+
+    assert health.name == 'Registlets'
     assert health.ok is True
