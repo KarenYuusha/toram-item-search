@@ -119,6 +119,19 @@ def test_registlet_cards_show_effect_sources_and_affected_skills() -> None:
     assert 'Affected Skills' in source
 
 
+def test_registlet_cards_render_match_reason_and_level_badges() -> None:
+    source = text('ui/registlet_cards.py')
+    assert 'Matched by name' in source
+    assert 'Matched by effect:' in source
+    assert 'Matched by Stoodie Lv' in source
+    assert 'Matched by fuzzy name' in source
+    assert ':gray-badge[Lv' in source
+
+
+def test_registlet_results_pass_outcome_match_to_cards() -> None:
+    assert 'match=outcome.match' in text('ui/results.py')
+
+
 def test_skill_dialog_renders_related_registlets() -> None:
     source = text('ui/skill_dialog.py')
     assert 'related_registlets' in source
