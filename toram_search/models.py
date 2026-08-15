@@ -7,11 +7,16 @@ from typing import TYPE_CHECKING, Literal
 from toram_search.interpretation import QueryInterpretation
 
 if TYPE_CHECKING:
+    from toram_search.food.models import FoodSearchOutcome
     from toram_search.items.models import ItemSearchOutcome
+    from toram_search.registlets.models import RegistletSearchOutcome
     from toram_search.skills.models import SkillSearchOutcome
 
-DatabaseMode = Literal['Universal', 'Items', 'Skills']
-SuggestionKind = Literal['Item', 'Skill', 'Skill Tree', 'Stat', 'Item Type', 'Ailment']
+DatabaseMode = Literal['Universal', 'Items', 'Skills', 'Food', 'Registlets']
+SuggestionKind = Literal[
+    'Item', 'Skill', 'Skill Tree', 'Stat', 'Item Type', 'Ailment',
+    'Food Stat', 'Registlet', 'Stoodie Level',
+]
 
 
 @dataclass(frozen=True)
@@ -34,4 +39,6 @@ class UniversalSearchOutcome:
     query: str
     items: ItemSearchOutcome | None = None
     skills: SkillSearchOutcome | None = None
+    food: FoodSearchOutcome | None = None
+    registlets: RegistletSearchOutcome | None = None
     interpretation: QueryInterpretation | None = None
