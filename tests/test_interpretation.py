@@ -34,3 +34,23 @@ def test_route_quality_uses_specificity_only_after_route_family() -> None:
     broad = RouteQuality('structured', True, 1)
     narrow = RouteQuality('structured', True, 3)
     assert narrow.sort_key > broad.sort_key
+
+
+def test_content_route_sits_between_structured_no_result_and_weak_result() -> None:
+    assert RouteQuality('structured', False, 1).sort_key > RouteQuality('content', True, 99).sort_key
+    assert RouteQuality('content', True, 1).sort_key > RouteQuality('weak', True, 99).sort_key
+
+
+def test_new_domain_interpretations_are_valid() -> None:
+    food = QueryInterpretation(
+        domain='Food',
+        canonical_query='food maxmp',
+        chips=(QueryChip('food_stat', 'food_stat', 'Food: MaxMP', 'food maxmp', ''),),
+    )
+    stoodie = QueryInterpretation(
+        domain='Registlets',
+        canonical_query='std 220',
+        chips=(QueryChip('stoodie_level', 'stoodie_level', 'Stoodie Lv220', 'std 220', ''),),
+    )
+    assert food.query_without('food_stat') == ''
+    assert stoodie.query_without('stoodie_level') == ''
