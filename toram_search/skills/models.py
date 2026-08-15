@@ -64,6 +64,7 @@ class SkillCardResult:
     tree_name: str
     matched_field: str | None = None
     matched_value: str | None = None
+    related_registlets: tuple[str, ...] = ()
 
 SkillOutcomeKind = Literal["results", "structured", "compare", "suggest", "refuse", "not_found"]
 
