@@ -17,11 +17,12 @@ def test_app_has_no_startup_exception() -> None:
     assert list(app.exception) == []
 
 
-def test_app_defaults_to_universal_mode() -> None:
+def test_app_defaults_to_universal_mode_and_has_five_modes() -> None:
     app = AppTest.from_file(APP_PATH).run(timeout=10)
     radios = list(app.sidebar.radio)
     assert radios
     assert radios[0].value == 'Universal'
+    assert tuple(radios[0].options) == ('Universal', 'Items', 'Skills', 'Food', 'Registlets')
 
 
 def test_example_button_fills_query_without_searching() -> None:
@@ -30,6 +31,17 @@ def test_example_button_fills_query_without_searching() -> None:
     target.click().run(timeout=10)
     assert app.session_state['query'] == 'Guardian'
     assert app.session_state['last_outcome'] is None
+
+
+def test_food_example_fills_query_without_submitting() -> None:
+    app = AppTest.from_file(APP_PATH).run(timeout=10)
+    before_nonce = app.session_state['last_submission_nonce']
+    target = next(button for button in app.button if button.label == 'food maxmp')
+    target.click().run(timeout=10)
+
+    assert app.session_state['query'] == 'food maxmp'
+    assert app.session_state['last_outcome'] is None
+    assert app.session_state['last_submission_nonce'] == before_nonce
 
 
 def test_chip_removal_fills_query_clears_results_and_does_not_submit() -> None:
@@ -51,6 +63,8 @@ def test_chip_removal_fills_query_clears_results_and_does_not_submit() -> None:
     )
     app.session_state['item_limit'] = 60
     app.session_state['skill_limit'] = 40
+    app.session_state['food_limit'] = 30
+    app.session_state['registlet_limit'] = 50
     app.run(timeout=10)
 
     target = next(button for button in app.button if button.label == 'Critical Rate ×')
@@ -61,7 +75,27 @@ def test_chip_removal_fills_query_clears_results_and_does_not_submit() -> None:
     assert app.session_state['last_submission_nonce'] == 'already-submitted'
     assert app.session_state['item_limit'] == 20
     assert app.session_state['skill_limit'] == 20
+    assert app.session_state['food_limit'] == 20
+    assert app.session_state['registlet_limit'] == 20
     assert not any(button.label.endswith(' ×') for button in app.button)
+
+
+def test_mode_change_clears_outcome_and_resets_all_limits() -> None:
+    app = AppTest.from_file(APP_PATH).run(timeout=10)
+    app.session_state['last_outcome'] = UniversalSearchOutcome(query='old')
+    app.session_state['item_limit'] = 60
+    app.session_state['skill_limit'] = 40
+    app.session_state['food_limit'] = 30
+    app.session_state['registlet_limit'] = 50
+    radio = list(app.sidebar.radio)[0]
+    radio.set_value('Food').run(timeout=10)
+
+    assert app.session_state['last_mode'] == 'Food'
+    assert app.session_state['last_outcome'] is None
+    assert app.session_state['item_limit'] == 20
+    assert app.session_state['skill_limit'] == 20
+    assert app.session_state['food_limit'] == 20
+    assert app.session_state['registlet_limit'] == 20
 
 
 def test_root_entrypoint_exists() -> None:
