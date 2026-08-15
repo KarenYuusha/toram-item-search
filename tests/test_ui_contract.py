@@ -133,6 +133,12 @@ def test_food_cards_group_codes_by_level() -> None:
     assert 'Lv.' in source
 
 
+def test_food_cards_keep_highest_level_grouping_and_code_copy_affordance() -> None:
+    source = text('ui/food_cards.py')
+    assert 'for level in sorted(grouped, reverse=True)' in source
+    assert 'st.code(code, language=None)' in source
+
+
 def test_registlet_cards_show_effect_sources_and_affected_skills() -> None:
     source = text('ui/registlet_cards.py')
     assert 'Max Lv.' in source
