@@ -1,0 +1,461 @@
+{
+  "metadata": {
+    "domain": "food",
+    "canonical_stat_count": 39,
+    "elements": [
+      "fire",
+      "earth",
+      "water",
+      "light",
+      "wind",
+      "dark",
+      "neutral"
+    ],
+    "notes": [
+      "Codes and player names are result fields, not searchable aliases.",
+      "Element-based stats are expanded explicitly for deterministic matching.",
+      "The duplicate ATK entry from the supplied stat list is represented once."
+    ]
+  },
+  "stats": [
+    {
+      "key": "maxmp",
+      "display": "MaxMP",
+      "aliases": [
+        "maxmp",
+        "max mp",
+        "mp"
+      ]
+    },
+    {
+      "key": "maxhp",
+      "display": "MaxHP",
+      "aliases": [
+        "maxhp",
+        "max hp",
+        "hp"
+      ]
+    },
+    {
+      "key": "str",
+      "display": "STR",
+      "aliases": [
+        "str",
+        "strength"
+      ]
+    },
+    {
+      "key": "int",
+      "display": "INT",
+      "aliases": [
+        "int",
+        "intelligence"
+      ]
+    },
+    {
+      "key": "vit",
+      "display": "VIT",
+      "aliases": [
+        "vit",
+        "vitality"
+      ]
+    },
+    {
+      "key": "agi",
+      "display": "AGI",
+      "aliases": [
+        "agi",
+        "agility"
+      ]
+    },
+    {
+      "key": "dex",
+      "display": "DEX",
+      "aliases": [
+        "dex",
+        "dexterity"
+      ]
+    },
+    {
+      "key": "accuracy",
+      "display": "Accuracy",
+      "aliases": [
+        "accuracy",
+        "acc",
+        "hit"
+      ]
+    },
+    {
+      "key": "dodge",
+      "display": "Dodge",
+      "aliases": [
+        "dodge",
+        "flee"
+      ]
+    },
+    {
+      "key": "def",
+      "display": "DEF",
+      "aliases": [
+        "def",
+        "defense"
+      ]
+    },
+    {
+      "key": "mdef",
+      "display": "MDEF",
+      "aliases": [
+        "mdef",
+        "magic def",
+        "magic defense"
+      ]
+    },
+    {
+      "key": "matk",
+      "display": "MATK",
+      "aliases": [
+        "matk",
+        "magic atk",
+        "magic attack"
+      ]
+    },
+    {
+      "key": "atk",
+      "display": "ATK",
+      "aliases": [
+        "atk",
+        "attack"
+      ]
+    },
+    {
+      "key": "weapon_atk",
+      "display": "Weapon ATK",
+      "aliases": [
+        "weapon atk",
+        "weapon attack",
+        "watk",
+        "w atk"
+      ]
+    },
+    {
+      "key": "physical_resistance_pct",
+      "display": "Physical Resistance %",
+      "aliases": [
+        "physical resistance",
+        "physical resistance%",
+        "physical resist",
+        "physical resist%",
+        "phys resistance",
+        "phys resist",
+        "phys res",
+        "p res",
+        "pres"
+      ]
+    },
+    {
+      "key": "magic_resistance_pct",
+      "display": "Magic Resistance %",
+      "aliases": [
+        "magic resistance",
+        "magic resistance%",
+        "magic resist",
+        "magic resist%",
+        "magic res",
+        "m res",
+        "mres"
+      ]
+    },
+    {
+      "key": "stronger_against_fire_pct",
+      "display": "Stronger Against Fire %",
+      "aliases": [
+        "stronger against fire",
+        "stronger against fire%",
+        "% stronger against fire",
+        "dt fire",
+        "dte fire",
+        "dtf",
+        "fire dt",
+        "fire dte",
+        "fire"
+      ]
+    },
+    {
+      "key": "stronger_against_earth_pct",
+      "display": "Stronger Against Earth %",
+      "aliases": [
+        "stronger against earth",
+        "stronger against earth%",
+        "% stronger against earth",
+        "dt earth",
+        "dte earth",
+        "dte",
+        "earth dt",
+        "earth dte",
+        "earth"
+      ]
+    },
+    {
+      "key": "stronger_against_water_pct",
+      "display": "Stronger Against Water %",
+      "aliases": [
+        "stronger against water",
+        "stronger against water%",
+        "% stronger against water",
+        "dt water",
+        "dte water",
+        "dtw",
+        "water dt",
+        "water dte",
+        "water"
+      ]
+    },
+    {
+      "key": "stronger_against_light_pct",
+      "display": "Stronger Against Light %",
+      "aliases": [
+        "stronger against light",
+        "stronger against light%",
+        "% stronger against light",
+        "dt light",
+        "dte light",
+        "light dt",
+        "light dte",
+        "light"
+      ]
+    },
+    {
+      "key": "stronger_against_wind_pct",
+      "display": "Stronger Against Wind %",
+      "aliases": [
+        "stronger against wind",
+        "stronger against wind%",
+        "% stronger against wind",
+        "dt wind",
+        "dte wind",
+        "wind dt",
+        "wind dte",
+        "wind"
+      ]
+    },
+    {
+      "key": "stronger_against_dark_pct",
+      "display": "Stronger Against Dark %",
+      "aliases": [
+        "stronger against dark",
+        "stronger against dark%",
+        "% stronger against dark",
+        "dt dark",
+        "dte dark",
+        "dark dt",
+        "dark dte",
+        "dark"
+      ]
+    },
+    {
+      "key": "stronger_against_neutral_pct",
+      "display": "Stronger Against Neutral %",
+      "aliases": [
+        "stronger against neutral",
+        "stronger against neutral%",
+        "% stronger against neutral",
+        "dt neutral",
+        "dte neutral",
+        "neutral dt",
+        "neutral dte",
+        "neutral"
+      ]
+    },
+    {
+      "key": "exp_gain_pct",
+      "display": "EXP Gain %",
+      "aliases": [
+        "exp gain",
+        "exp gain%",
+        "exp",
+        "xp",
+        "exp%",
+        "experience gain"
+      ]
+    },
+    {
+      "key": "drop_rate_pct",
+      "display": "Drop Rate %",
+      "aliases": [
+        "drop rate",
+        "drop rate%",
+        "drop",
+        "drop%"
+      ]
+    },
+    {
+      "key": "fire_resistance_pct",
+      "display": "Fire Resistance %",
+      "aliases": [
+        "fire resistance",
+        "fire resistance%",
+        "+fire resistance",
+        "+fire resistance%",
+        "fire resist",
+        "fire resist%",
+        "fire res",
+        "fire res%"
+      ]
+    },
+    {
+      "key": "earth_resistance_pct",
+      "display": "Earth Resistance %",
+      "aliases": [
+        "earth resistance",
+        "earth resistance%",
+        "+earth resistance",
+        "+earth resistance%",
+        "earth resist",
+        "earth resist%",
+        "earth res",
+        "earth res%"
+      ]
+    },
+    {
+      "key": "water_resistance_pct",
+      "display": "Water Resistance %",
+      "aliases": [
+        "water resistance",
+        "water resistance%",
+        "+water resistance",
+        "+water resistance%",
+        "water resist",
+        "water resist%",
+        "water res",
+        "water res%"
+      ]
+    },
+    {
+      "key": "light_resistance_pct",
+      "display": "Light Resistance %",
+      "aliases": [
+        "light resistance",
+        "light resistance%",
+        "+light resistance",
+        "+light resistance%",
+        "light resist",
+        "light resist%",
+        "light res",
+        "light res%"
+      ]
+    },
+    {
+      "key": "wind_resistance_pct",
+      "display": "Wind Resistance %",
+      "aliases": [
+        "wind resistance",
+        "wind resistance%",
+        "+wind resistance",
+        "+wind resistance%",
+        "wind resist",
+        "wind resist%",
+        "wind res",
+        "wind res%"
+      ]
+    },
+    {
+      "key": "dark_resistance_pct",
+      "display": "Dark Resistance %",
+      "aliases": [
+        "dark resistance",
+        "dark resistance%",
+        "+dark resistance",
+        "+dark resistance%",
+        "dark resist",
+        "dark resist%",
+        "dark res",
+        "dark res%"
+      ]
+    },
+    {
+      "key": "neutral_resistance_pct",
+      "display": "Neutral Resistance %",
+      "aliases": [
+        "neutral resistance",
+        "neutral resistance%",
+        "+neutral resistance",
+        "+neutral resistance%",
+        "neutral resist",
+        "neutral resist%",
+        "neutral res",
+        "neutral res%"
+      ]
+    },
+    {
+      "key": "physical_barrier",
+      "display": "Physical Barrier",
+      "aliases": [
+        "physical barrier",
+        "phys barrier",
+        "p barrier",
+        "p bar"
+      ]
+    },
+    {
+      "key": "magic_barrier",
+      "display": "Magic Barrier",
+      "aliases": [
+        "magic barrier",
+        "m barrier",
+        "m bar"
+      ]
+    },
+    {
+      "key": "fractional_barrier_pct",
+      "display": "Fractional Barrier %",
+      "aliases": [
+        "fractional barrier",
+        "fractional barrier%",
+        "frac barrier",
+        "frac barrier%"
+      ]
+    },
+    {
+      "key": "critical_rate",
+      "display": "Critical Rate",
+      "aliases": [
+        "critical rate",
+        "crit rate",
+        "critical",
+        "crit",
+        "cr"
+      ]
+    },
+    {
+      "key": "attack_mp_recovery",
+      "display": "Attack MP Recovery",
+      "aliases": [
+        "attack mp recovery",
+        "atk mp recovery",
+        "attack mp recover",
+        "ampr"
+      ]
+    },
+    {
+      "key": "aggro_pct",
+      "display": "+Aggro %",
+      "aliases": [
+        "aggro",
+        "aggro%",
+        "+aggro",
+        "+aggro%",
+        "positive aggro"
+      ]
+    },
+    {
+      "key": "negative_aggro_pct",
+      "display": "-Aggro %",
+      "aliases": [
+        "-aggro",
+        "-aggro%",
+        "negative aggro",
+        "minus aggro"
+      ]
+    }
+  ]
+}
