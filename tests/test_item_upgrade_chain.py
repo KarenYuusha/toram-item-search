@@ -38,6 +38,19 @@ def test_upgrade_query_returns_complete_chain_oldest_to_newest(tmp_path: Path, t
     ]
 
 
+@pytest.mark.parametrize('target', ('Old Crystal', 'New Crystal', 'Newest Crystal'))
+def test_upgrade_chain_marks_only_the_searched_crysta(tmp_path: Path, target: str) -> None:
+    service = _make_three_step_upgrade_service(tmp_path)
+    try:
+        outcome = service.search(f'upgrade {target}')
+    finally:
+        service.close()
+
+    marked = [row.item.name for row in outcome.results if row.match_kind == 'upgrade_target']
+    assert marked == [target]
+    assert all(row.match_kind in {'upgrade', 'upgrade_target'} for row in outcome.results)
+
+
 def test_upgrade_query_is_documented_in_item_help_and_examples(tmp_path: Path) -> None:
     main_source = Path('main.py').read_text(encoding='utf-8')
     sidebar_source = Path('ui/sidebar.py').read_text(encoding='utf-8')

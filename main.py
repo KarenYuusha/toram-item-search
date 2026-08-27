@@ -169,7 +169,8 @@ if outcome is not None:
             st.session_state.last_outcome=None
             _reset_limits()
             st.rerun()
-        if len(outcome.items.results)>st.session_state.item_limit and st.button('Show more items',key='show_more_items'):
+        item_is_upgrade_path=any(row.match_kind=='upgrade_target' for row in outcome.items.results)
+        if not item_is_upgrade_path and len(outcome.items.results)>st.session_state.item_limit and st.button('Show more items',key='show_more_items'):
             st.session_state.item_limit+=20; st.rerun()
     if outcome.skills is not None:
         skill_fill=render_skill_results(outcome.skills,limit=st.session_state.skill_limit)

@@ -87,6 +87,9 @@ class ItemSearchService:
         if len(emitted)<len(nodes):
             ordered.extend(sorted((row for item_id,row in nodes.items() if item_id not in emitted),key=key))
         return tuple(ordered)
+    @staticmethod
+    def _upgrade_cards(chain,target_id:int):
+        return tuple(ItemCardResult(item,match_kind='upgrade_target' if item.id==target_id else 'upgrade') for item in chain)
     def search(self,query:str)->ItemSearchOutcome:
         raw=' '.join(str(query).split())
 
@@ -126,8 +129,9 @@ class ItemSearchService:
         if q.startswith('upgrade '):
             target=raw[8:].strip(); exact=self.repository.exact_upgrade_name_matches(target)
             if exact:
-                chain=self._upgrade_chain(exact[0])
-                return finish('results',tuple(ItemCardResult(item,match_kind='upgrade') for item in chain),routing_confidence='strong',family='exact',specificity=1)
+                anchor=exact[0]
+                chain=self._upgrade_chain(anchor)
+                return finish('results',self._upgrade_cards(chain,anchor.id),routing_confidence='strong',family='exact',specificity=1)
             fuzzy=[r for r in self.repository.fuzzy_items(target) if 'crysta' in r[0].item_type.casefold()]
             prefix_chains=[]
             for item,_score,match_kind in fuzzy:
@@ -135,10 +139,10 @@ class ItemSearchService:
                     continue
                 chain=self._upgrade_chain(item)
                 if len(chain)>1:
-                    prefix_chains.append(chain)
+                    prefix_chains.append((item,chain))
             if len(prefix_chains)==1:
-                chain=prefix_chains[0]
-                return finish('results',tuple(ItemCardResult(item,match_kind='upgrade') for item in chain),routing_confidence='strong',family='structured',specificity=1)
+                anchor,chain=prefix_chains[0]
+                return finish('results',self._upgrade_cards(chain,anchor.id),routing_confidence='strong',family='structured',specificity=1)
             if fuzzy:return finish('results',tuple(ItemCardResult(i,score=s,match_kind=k) for i,s,k in fuzzy),routing_confidence='strong',family='structured',specificity=1)
             return finish('not_found',message='No matching crysta found.',routing_confidence='strong',family='structured',specificity=1)
         exact=self.repository.exact_name_matches(raw)

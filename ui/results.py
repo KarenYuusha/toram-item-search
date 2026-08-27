@@ -9,6 +9,7 @@ from ui.food_cards import render_food_cards
 from ui.item_cards import render_item_cards
 from ui.registlet_cards import render_registlet_cards
 from ui.skill_cards import render_skill_cards
+from ui.upgrade_path import render_upgrade_path
 
 
 def _render_message(kind:str,message:str|None,suggestions:tuple[str,...],*,key_prefix:str)->str|None:
@@ -30,7 +31,11 @@ def _render_message(kind:str,message:str|None,suggestions:tuple[str,...],*,key_p
 def render_item_results(outcome:ItemSearchOutcome,*,database_path:Path,limit:int)->str|None:
     fill_query=_render_message(outcome.kind,outcome.message,outcome.suggested_queries,key_prefix='item')
     if outcome.results:
-        st.markdown(f'### Items · {len(outcome.results)}'); render_item_cards(outcome.results,database_path=database_path,limit=limit)
+        is_upgrade_path=any(row.match_kind=='upgrade_target' for row in outcome.results)
+        if is_upgrade_path:
+            render_upgrade_path(outcome.results,database_path=database_path)
+        else:
+            st.markdown(f'### Items · {len(outcome.results)}'); render_item_cards(outcome.results,database_path=database_path,limit=limit)
     return fill_query
 
 
