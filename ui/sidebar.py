@@ -19,9 +19,11 @@ def render_sidebar() -> DatabaseMode:
                 """
 **Items**
 
-Search by item name, stat, item type, comparisons, or ranking.
+Search by item name, stat, item type, comparisons, ranking, or crysta upgrade chain.
 
-Examples: `cr bow`, `hp >= 5000 armor`, `-aggro xtal`, `highest cr`.
+Use `upgrade <crysta name>` to show the full crysta upgrade chain from the first crysta to the last.
+
+Examples: `cr bow`, `hp >= 5000 armor`, `-aggro xtal`, `highest cr`, `upgrade Iconos`.
 
 **Skills**
 
