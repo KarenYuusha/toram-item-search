@@ -164,3 +164,16 @@ def test_skill_dialog_renders_related_registlets() -> None:
     source = text('ui/skill_dialog.py')
     assert 'related_registlets' in source
     assert 'Related Registlets' in source
+
+
+def test_upgrade_results_use_dedicated_path_renderer() -> None:
+    results_source = text('ui/results.py')
+    assert 'render_upgrade_path' in results_source
+    assert "'upgrade_target'" in results_source
+
+    path = Path('ui/upgrade_path.py')
+    assert path.is_file()
+    source = path.read_text(encoding='utf-8')
+    for label in ('Upgrade Path', 'Upgrades to', 'Searched', 'View details'):
+        assert label in source
+    assert 'st.image' in source
