@@ -11,7 +11,7 @@ from .models import ItemCardResult, ItemSearchOutcome
 from .repository import ItemRepository
 from .stat_query import StatQuerySyntaxError, parse_stat_expression
 
-_HELP = "Search by item name, stat, item type, numeric comparisons, AND/OR, or upgrade relationships. Examples: cr xtal; hp >= 5000 armor; hp > 5000 and cr bow."
+_HELP = "Search by item name, stat, item type, numeric comparisons, AND/OR, or upgrade relationships. Use upgrade <crysta name> to show the full crysta upgrade chain from first to last. Examples: cr xtal; hp >= 5000 armor; hp > 5000 and cr bow; upgrade Iconos."
 _SUBJECTIVE = re.compile(r"\b(?:best|strongest)\b.*\b(?:tank|dps|build|mage)\b|\b(?:tank|dps)\b.*\b(?:xtal|crysta|item|build)\b",re.I)
 
 class ItemSearchService:
@@ -47,6 +47,46 @@ class ItemSearchService:
                 order.append(item.id)
             grouped[item.id][1].append(match)
         return tuple(ItemCardResult(grouped[item_id][0],tuple(grouped[item_id][1])) for item_id in order)
+    def _upgrade_chain(self,item):
+        nodes={}
+        edges={}
+        pending=[item]
+        while pending:
+            current=pending.pop()
+            if current.id in nodes:
+                continue
+            nodes[current.id]=current
+            for predecessor in self.repository.get_upgrade_predecessors(current.id):
+                edges.setdefault(predecessor.id,set()).add(current.id)
+                pending.append(predecessor)
+            for successor in self.repository.get_upgrade_successors(current.id):
+                edges.setdefault(current.id,set()).add(successor.id)
+                pending.append(successor)
+        indegree={item_id:0 for item_id in nodes}
+        for successors in edges.values():
+            for successor_id in successors:
+                if successor_id in indegree:
+                    indegree[successor_id]+=1
+        key=lambda x:(x.name.casefold(),x.id)
+        ready=sorted((nodes[item_id] for item_id,degree in indegree.items() if degree==0),key=key)
+        ordered=[]
+        emitted=set()
+        while ready:
+            current=ready.pop(0)
+            if current.id in emitted:
+                continue
+            emitted.add(current.id)
+            ordered.append(current)
+            for successor_id in sorted(edges.get(current.id,()),key=lambda item_id:key(nodes[item_id])):
+                if successor_id not in indegree:
+                    continue
+                indegree[successor_id]-=1
+                if indegree[successor_id]==0:
+                    ready.append(nodes[successor_id])
+                    ready.sort(key=key)
+        if len(emitted)<len(nodes):
+            ordered.extend(sorted((row for item_id,row in nodes.items() if item_id not in emitted),key=key))
+        return tuple(ordered)
     def search(self,query:str)->ItemSearchOutcome:
         raw=' '.join(str(query).split())
 
@@ -86,7 +126,8 @@ class ItemSearchService:
         if q.startswith('upgrade '):
             target=raw[8:].strip(); exact=self.repository.exact_upgrade_name_matches(target)
             if exact:
-                item=exact[0]; return finish('results',(ItemCardResult(item),),routing_confidence='strong',family='exact',specificity=1)
+                chain=self._upgrade_chain(exact[0])
+                return finish('results',tuple(ItemCardResult(item,match_kind='upgrade') for item in chain),routing_confidence='strong',family='exact',specificity=1)
             fuzzy=[r for r in self.repository.fuzzy_items(target) if 'crysta' in r[0].item_type.casefold()]
             if fuzzy:return finish('results',tuple(ItemCardResult(i,score=s,match_kind=k) for i,s,k in fuzzy),routing_confidence='strong',family='structured',specificity=1)
             return finish('not_found',message='No matching crysta found.',routing_confidence='strong',family='structured',specificity=1)

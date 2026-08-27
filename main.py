@@ -72,7 +72,7 @@ can_search=bool(available_domains) if mode=='Universal' else mode in available_d
 
 examples={
     'Universal':('critical rate','food maxmp','physical pierce'),
-    'Items':('cr bow','hp >= 5000 armor','highest cr'),
+    'Items':('cr bow','hp >= 5000 armor','highest cr','upgrade Iconos'),
     'Skills':('Guardian','Shield Skills','skills that inflict stun'),
     'Food':('food maxmp','code ampr','food dt fire'),
     'Registlets':('std 220','Arrow Rain Enhancer','physical pierce'),
