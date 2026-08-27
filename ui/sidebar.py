@@ -56,6 +56,7 @@ In Universal mode, Registlet effect matches are weaker than exact or structured 
 
         - Skill descriptions are sourced from **Phantom's Library**.
         - Skill icons, item images, stats, and effects are sourced from **Coryn Club**.
+        - Registlet data is loaded from the project-maintained `registlets.json`, not the Item database.
 
         This is an **unofficial fan-made website** and is not affiliated with, endorsed by, or sponsored by **ASOBIMO, Inc.**  
         Toram Online and all related game content and assets are the property of **ASOBIMO, Inc.**

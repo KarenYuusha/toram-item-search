@@ -29,6 +29,13 @@ ITEM_TYPE_ALIASES = {
     "usable": "Usable", "consumable": "Usable",
 }
 STAT_ALIASES = {
+    "dte": "% stronger against earth", "dt earth": "% stronger against earth", "dtearth": "% stronger against earth",
+    "dtf": "% stronger against fire", "dt fire": "% stronger against fire", "dtfire": "% stronger against fire",
+    "dtw": "% stronger against wind", "dt wind": "% stronger against wind", "dtwind": "% stronger against wind",
+    "dtwa": "% stronger against water", "dt water": "% stronger against water", "dtwater": "% stronger against water",
+    "dtn": "% stronger against neutral", "dt neutral": "% stronger against neutral", "dtneutral": "% stronger against neutral",
+    "dtd": "% stronger against dark", "dt dark": "% stronger against dark", "dtdark": "% stronger against dark",
+    "dtl": "% stronger against light", "dt light": "% stronger against light", "dtlight": "% stronger against light",
     "cr": "critical rate", "cd": "critical damage", "crit rate": "critical rate",
     "hp": "maxhp", "max hp": "maxhp", "ampr": "attack mp recovery",
     "pp": "physical pierce %", "mp": "magic pierce %",
