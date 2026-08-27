@@ -157,6 +157,7 @@ def test_real_exact_guardian_has_no_interpretation_chips() -> None:
     )
     assert outcome.skills is not None
     assert any(row.skill.name.casefold() == 'guardian' for row in outcome.skills.results)
+    assert outcome.skills.route_quality.family == 'exact'
     assert outcome.interpretation is None
 
 
@@ -202,3 +203,29 @@ def test_real_bare_maxmp_never_activates_food() -> None:
     assert outcome.food is not None
     assert outcome.food.route_quality.family == 'none'
     assert outcome.food.results == ()
+
+
+@pytest.mark.parametrize(
+    ('partial_query', 'exact_query', 'target_name'),
+    (
+        ('upgrade Don', 'upgrade Don Profundo', 'Don Profundo'),
+        ('upgrade Trickster', 'upgrade Trickster Dragon Mimyugon', 'Trickster Dragon Mimyugon'),
+    ),
+)
+def test_real_partial_upgrade_name_expands_same_chain_as_exact(
+    partial_query: str,
+    exact_query: str,
+    target_name: str,
+) -> None:
+    service = ItemSearchService(ITEM_DATABASE)
+    try:
+        partial = service.search(partial_query)
+        exact = service.search(exact_query)
+    finally:
+        service.close()
+
+    partial_names = [row.item.name for row in partial.results]
+    exact_names = [row.item.name for row in exact.results]
+    assert target_name in partial_names
+    assert len(exact_names) > 1
+    assert partial_names == exact_names
