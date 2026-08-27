@@ -98,7 +98,7 @@ def test_main_uses_independent_four_source_health() -> None:
 def test_suggested_search_density_is_small_and_static() -> None:
     source = text('main.py')
     assert "'Universal':('critical rate','food maxmp','physical pierce')" in source
-    assert "'Items':('cr bow','hp >= 5000 armor','highest cr')" in source
+    assert "'Items':('cr bow','hp >= 5000 armor','highest cr','upgrade Iconos')" in source
     assert "'Skills':('Guardian','Shield Skills','skills that inflict stun')" in source
     assert "'Food':('food maxmp','code ampr','food dt fire')" in source
     assert "'Registlets':('std 220','Arrow Rain Enhancer','physical pierce')" in source
