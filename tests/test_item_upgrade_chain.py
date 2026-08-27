@@ -41,8 +41,8 @@ def test_upgrade_query_returns_complete_chain_oldest_to_newest(tmp_path: Path, t
 def test_upgrade_query_is_documented_in_item_help_and_examples(tmp_path: Path) -> None:
     main_source = Path('main.py').read_text(encoding='utf-8')
     sidebar_source = Path('ui/sidebar.py').read_text(encoding='utf-8')
-    assert "'upgrade New Crystal'" in main_source
-    assert 'upgrade New Crystal' in sidebar_source
+    assert "'upgrade Iconos'" in main_source
+    assert 'upgrade Iconos' in sidebar_source
 
     service = _make_three_step_upgrade_service(tmp_path)
     try:
