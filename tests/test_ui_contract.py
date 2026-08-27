@@ -177,3 +177,9 @@ def test_upgrade_results_use_dedicated_path_renderer() -> None:
     for label in ('Upgrade Path', 'Upgrades to', 'Searched', 'View details'):
         assert label in source
     assert 'st.image' in source
+    assert 'upgrade_successors' in source
+
+
+def test_upgrade_path_is_not_truncated_by_generic_item_limit() -> None:
+    source = text('main.py')
+    assert "row.match_kind=='upgrade_target'" in source
