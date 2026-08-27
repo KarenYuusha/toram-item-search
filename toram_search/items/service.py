@@ -129,6 +129,16 @@ class ItemSearchService:
                 chain=self._upgrade_chain(exact[0])
                 return finish('results',tuple(ItemCardResult(item,match_kind='upgrade') for item in chain),routing_confidence='strong',family='exact',specificity=1)
             fuzzy=[r for r in self.repository.fuzzy_items(target) if 'crysta' in r[0].item_type.casefold()]
+            prefix_chains=[]
+            for item,_score,match_kind in fuzzy:
+                if match_kind!='prefix':
+                    continue
+                chain=self._upgrade_chain(item)
+                if len(chain)>1:
+                    prefix_chains.append(chain)
+            if len(prefix_chains)==1:
+                chain=prefix_chains[0]
+                return finish('results',tuple(ItemCardResult(item,match_kind='upgrade') for item in chain),routing_confidence='strong',family='structured',specificity=1)
             if fuzzy:return finish('results',tuple(ItemCardResult(i,score=s,match_kind=k) for i,s,k in fuzzy),routing_confidence='strong',family='structured',specificity=1)
             return finish('not_found',message='No matching crysta found.',routing_confidence='strong',family='structured',specificity=1)
         exact=self.repository.exact_name_matches(raw)
