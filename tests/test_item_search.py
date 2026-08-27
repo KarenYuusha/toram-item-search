@@ -82,7 +82,8 @@ def test_upgrade_detail_is_available(tmp_path: Path) -> None:
     service = make_service(tmp_path)
     try:
         outcome = service.search('upgrade New Crystal')
-        detail = service.get_item(outcome.results[0].item.id)
+        new_crystal = next(row.item for row in outcome.results if row.item.name == 'New Crystal')
+        detail = service.get_item(new_crystal.id)
     finally:
         service.close()
     assert detail.upgrade_predecessors[0].name == 'Old Crystal'
