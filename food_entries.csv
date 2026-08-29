@@ -62,7 +62,7 @@ code,stat,level
 1032222,int,10
 1032222,maxmp,10
 6010701,int,10
-6010701,magic_resistance_pct,10
+6010701,physical_resistance_pct,10
 2020707,int,10
 1010147,int,9
 1010147,negative_aggro_pct,10
